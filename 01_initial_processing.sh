@@ -19,6 +19,8 @@ gtf2bed < gencode.v25.annotation.gtf > gencode.v25.annotation.bed
 gzip gencode.v25.annotation.gtf
 gzip gencode.v25.annotation.bed
 zcat gencode.v25.annotation.bed.gz| awk '$8 == "transcript" {print $0}' | gzip -f > gencode.v25.annotation.transcriptsOnly.bed.gz #only keep transcripts
+gzcat 100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz | awk -v OFS='\t' '{key=$1"_"$2"_"$3; print $1, $2, $3, key, $4, $5, $6, $7, $8, $9, $10, $11}' | gzip -f > temp.gzi #should have added a key (bedtools has that option). Adding my own.
+mv temp.gz 100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz
 # increase each transcript size by 1000 in each direction then merge overlapping transcripts
 bedtools slop -g /data/mcgaugheyd/genomes/GRCh38/hg38.chrom.sizes -b 1000 -i gencode.v25.annotation.transcriptsOnly.bed.gz | bedtools  merge -i - | gzip -f > gencode.v25.annotation.transcriptsOnly.slop_and_merged.bed.gz
 # now create 100bp sliding windows, slide by 1bp
