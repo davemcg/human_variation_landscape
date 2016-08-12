@@ -29,9 +29,9 @@ bedtools makewindows -b gencode.v25.annotation.transcriptsOnly.slop_and_merged.b
 ####
 # 2 create a 100bp window around each variant  
 # get ensembl variation data
-# I'm using 2016-07-01 release
-wget http://ftp.ensembl.org/pub/current_variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz
-wget http://ftp.ensembl.org/pub/current_variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz.tbi
+# I'm using 2016-07-01 release (85)
+wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz
+wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz.tbi
 zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | grep -v ^# | awk -v OFS='\t' '{print $1, $2-50, $2+50, $3}' | gzip -f > 20160701_ensembl_homo_sapiens_variation.100bp_window.bed.gz &
 
 ######
@@ -41,4 +41,10 @@ bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_conseque
 #2 loj the ensembl variation data back onto the 100bp window variant coordinates. One line for each overlap.
 bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz -a 20160701_ensembl_homo_sapiens_variation.100bp_window.bed.gz -loj -sorted | gzip -f > 20160701_ensembl_homo_sapiens_variation.100bp_window.loj.dat.gz &
 
+########
+# Calculate stats!
+# 1
+gzcat ~/100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz | scripts/./loj_groupby_gw.py 
 
+# 2
+gzcat ~/20160701_ensembl_homo_sapiens_variation.100bp_window.loj.dat.gz | ./loj_groupby.py > 20160701_ensembl_homo_sapiens_variation.100bp_window.vcf 
