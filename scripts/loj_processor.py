@@ -4,6 +4,12 @@ import re
 import fileinput
 import sqlite3
 
+###
+"""
+Creates a sqlite file with several stats when run on the 'loj' files created from the bedtools 
+intersect tool with -loj -sorted
+"""
+
 # create sqlite db
 db = sqlite3.connect('/data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/var_info.sqlite')
 #db = sqlite3.connect(':memory:')
