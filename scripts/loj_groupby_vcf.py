@@ -7,7 +7,14 @@ import re
 import sqlite3
 import statistics
 
+"""
+Coded for the ensembl v85 targeted variations (approach 2). Will take the loj
+file as input (through pipe) created with bedtools intersect with -loj and -sorted.
 
+Outputs a vcf with four custom tags (see below for details) for each of the ensembl
+variants to stdout
+
+"""
 # print VCF header
 print('##INFO=<ID=VLN100,Number=1,Type=Integer,Description="Number of known variants within 100bp of this variant">')
 print('##INFO=<ID=VLN100maf,Number=1,Type=Integer,Description="Number of known variants within 100bp of this variant that have a MAF">')
