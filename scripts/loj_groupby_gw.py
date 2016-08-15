@@ -1,5 +1,4 @@
-#!/usr/local/bin/python3
-##!/usr/local/Anaconda/envs/py3.4.3/bin/python
+#!/usr/local/Anaconda/envs/py3.4.3/bin/python
 
 from itertools import groupby
 import fileinput
@@ -47,10 +46,10 @@ for key, chunk in groupby(fileinput.input(), lambda x: x.split()[3]):
 		mean_maf = sum(maf) / len(maf)		
 		median_maf = statistics.median(maf)
 	#print(chr,pos-1,pos,id, num_of_var, number_of_maf, mean_maf, median_maf)
-	f1_data = chr + ' ' + str(pos-1) + ' ' + id + ' ' + str(num_of_var) + '\n'
-	f2_data = chr + ' ' + str(pos-1) + ' ' + id + ' ' + str(number_of_maf) + '\n'
-	f3_data = chr + ' ' + str(pos-1) + ' ' + id + ' ' + str(mean_maf) + '\n'
-	f4_data = chr + ' ' + str(pos-1) + ' ' + id + ' ' + str(median_maf) + '\n'
+	f1_data = chr + ' ' + str(pos-1) + ' ' + str(pos) + ' ' + id + ' ' + str(num_of_var) + '\n'
+	f2_data = chr + ' ' + str(pos-1) + ' ' + str(pos) + ' ' + id + ' ' + str(number_of_maf) + '\n'
+	f3_data = chr + ' ' + str(pos-1) + ' ' + str(pos) + ' ' + id + ' ' + str(mean_maf) + '\n'
+	f4_data = chr + ' ' + str(pos-1) + ' ' + str(pos) + ' ' + id + ' ' + str(median_maf) + '\n'
 
 	f1.write(bytes(f1_data, 'UTF-8'))
 	f2.write(bytes(f2_data, 'UTF-8'))
