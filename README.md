@@ -17,4 +17,9 @@ OK, so this new bed file is then left outer joined (loj) with release 85 of Ense
 - number of variants with a MAF
 - mean AND median MAF (skipping the variants without a MAF)
 
-Four bed files are created for the four statistics. These can be used in two primary ways: first, they can be compressed into a bedGraph format (https://github.com/davemcg/human_variation_landscape/blob/master/scripts/bed_to_bedGraph.py) and next they can be used as is to merge with our VCF files to more quickly determine the variant lanscape stats for our exomes. 
+Four bed files are created for the four statistics. These can be used in two primary ways: first, they can be compressed into a bedGraph format (https://github.com/davemcg/human_variation_landscape/blob/master/scripts/bed_to_bedGraph.py) to view more easily on the UCSC genome browser and next they can be used as is to merge with our VCF files to more quickly determine the variant lanscape stats for our exomes. 
+
+Angle 2:
+Annotate every known variant (Ensembl's human variation version 85) with surrounding variation (again, 100bp window. 50 up and 50 down). Like Angle 1, see https://github.com/davemcg/human_variation_landscape/blob/master/01_initial_processing.sh for details. Simpler than above. Basically just use awk to take each coordinate and add 50 bp up and down. Then do the loj, then use a modification of loj_groupby_gw.py (https://github.com/davemcg/human_variation_landscape/blob/master/scripts/loj_groupby_vcf.py) which creates the four stats in Angle 1, and outputs a single new VCF with the new stats.
+
+What is this for? To test whether this theory holds ANY water. First, we can calculate basic stats (summary stats, histograms, break by type of variant (indel, SNP). Then we can check the ClinVar Path/Not Path annotation to see whether the pathogenic annotated variants have a significant difference in the amount of known variation around them. Could also check against CADD, Phred, etc. 
