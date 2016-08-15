@@ -4,6 +4,7 @@ Analysis of human variation in defined windows
 Question: Does looking at the amount of known variation around a given variant inform whether the given variant is more or less likely to be functional? We would assume that since functional protein domains tend to be more conserved (citation needed), that variants that were in regions sparse of known variation are more likely to be deleterious. 
 
 Two angles are being taken right now for the project:
+
 1. Labeling each base pair of all known transcripts
 2. Annotation of known variation
 
