@@ -19,8 +19,7 @@ gtf2bed < gencode.v25.annotation.gtf > gencode.v25.annotation.bed
 gzip gencode.v25.annotation.gtf
 gzip gencode.v25.annotation.bed
 zcat gencode.v25.annotation.bed.gz| awk '$8 == "transcript" {print $0}' | gzip -f > gencode.v25.annotation.transcriptsOnly.bed.gz #only keep transcripts
-gzcat 100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz | awk -v OFS='\t' '{key=$1"_"$2"_"$3; print $1, $2, $3, key, $4, $5, $6, $7, $8, $9, $10, $11}' | gzip -f > temp.gzi #should have added a key (bedtools has that option). Adding my own.
-mv temp.gz 100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz
+
 # increase each transcript size by 1000 in each direction then merge overlapping transcripts
 bedtools slop -g /data/mcgaugheyd/genomes/GRCh38/hg38.chrom.sizes -b 1000 -i gencode.v25.annotation.transcriptsOnly.bed.gz | bedtools  merge -i - | gzip -f > gencode.v25.annotation.transcriptsOnly.slop_and_merged.bed.gz
 # now create 100bp sliding windows, slide by 1bp
@@ -29,7 +28,7 @@ bedtools makewindows -b gencode.v25.annotation.transcriptsOnly.slop_and_merged.b
 ####
 # 2 create a 100bp window around each variant  
 # get ensembl variation data
-# I'm using 2016-07-01 release (85)
+# I'm using 2016-07-01 release (85); same as above
 wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz
 wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz.tbi
 zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | grep -v ^# | awk -v OFS='\t' '{print $1, $2-50, $2+50, $3}' | gzip -f > 20160701_ensembl_homo_sapiens_variation.100bp_window.bed.gz &
@@ -37,6 +36,8 @@ zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | gre
 ######
 #1 loj the ensemb variation data back onto the sliding 100bp windows 
 bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz -a gencode.v25.annotation.transcriptsOnly.slop_and_merged.windowed.ensembl.bed.gz -loj -sorted | gzip -f > 100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz
+gzcat 100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz | awk -v OFS='\t' '{key=$1"_"$2"_"$3; print $1, $2, $3, key, $4, $5, $6, $7, $8, $9, $10, $11}' | gzip -f > temp.gz #should have added a key (bedtools has that option). Adding my own.
+mv temp.gz 100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz
 
 #2 loj the ensembl variation data back onto the 100bp window variant coordinates. One line for each overlap.
 bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz -a 20160701_ensembl_homo_sapiens_variation.100bp_window.bed.gz -loj -sorted | gzip -f > 20160701_ensembl_homo_sapiens_variation.100bp_window.loj.dat.gz &
@@ -44,7 +45,13 @@ bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_conseque
 ########
 # Calculate stats!
 # 1
-gzcat ~/100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz | scripts/./loj_groupby_gw.py 
+# gzcat ~/100bp_gene_windows_1bp_slide.20160701_ensembl_homo_sapiens_variation.loj.dat.gz | scripts/./loj_groupby_gw.py 
+# could do above, but really need to use sbatch on biowulf2
+sbatch --time=12:00:00 ~/git/human_variation_landscape/scripts/run_loj_groupby_gw.sh 
+# compress bed files down to bedGraph with scripts/bed_to_bedGraph.py
+swarm -f ~/git/human_variation_landscape/scripts/run_bed_to_bedGraph.swarm
 
-# 2
+# 2. this also takes forever. I did this on my local computer, hence no shell wrapper script
 gzcat ~/20160701_ensembl_homo_sapiens_variation.100bp_window.loj.dat.gz | ./loj_groupby.py > 20160701_ensembl_homo_sapiens_variation.100bp_window.vcf 
+
+
