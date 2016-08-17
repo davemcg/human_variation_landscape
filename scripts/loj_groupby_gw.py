@@ -5,26 +5,47 @@ import fileinput
 import re
 import gzip
 import statistics
+import argparse
+from argparse import RawTextHelpFormatter
 
+parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description= \
+	"""
+	This script is designed to process the loj (bedtools intersect with -loj and -sorted)
+	for the windows made against the genocode transcripts. It will output four bed files
+	that differ only in the 5th column, the score column. The following four scores
+	are calculated for EVERY position in EVERY transcript:
+	1. Number of variants in the 100bp window
+	2. Number of variants in the 100bp window with a MAF
+	3. Mean MAF
+	4. Median MAF
+	""", formatter_class=RawTextHelpFormatter)
 
-"""
-This script is designed to process the loj (bedtools intersect with -loj and -sorted)
-for the windows made against the genocode transcripts. It will output four bed files
-that differ only in the 5th column, the score column. The following four scores
-are calculated for EVERY position in EVERY transcript:
-1. Number of variants in the 100bp window
-2. Number of variants in the 100bp window with a MAF
-3. Mean MAF
-4. Median MAF
-"""
+parser.add_argument('-n','--name', required=True, \
+        help= \
+		"""
+		Give filename for the four files to be outputted. VLN100*.bed.gz will be appended. 
+		* Not literally used. * will be change for each of the four outputted files.
+		""")
+parser.add_argument('-l','--loj_file', required=True, type=argparse.FileType('r'), \
+        help = \
+        'File to be collapsed and stats calculated')
+
+args = parser.parse_args()
+
+name = args.name
+
 # Create files to write to
-f1 = gzip.open('Gencode_v25_Ensembl_v85.VLN100.bed.gz','wb')
-f2 = gzip.open('Gencode_v25_Ensembl_v85.VLN100maf.bed.gz','wb')
-f3 = gzip.open('Gencode_v25_Ensembl_v85.VLN100mean_maf.bed.gz','wb')
-f4 = gzip.open('Gencode_v25_Ensembl_v85.VLN100median_maf.bed.gz','wb')
+f1 = gzip.open(name + '.VLN100.bed.gz','wb')
+f2 = gzip.open(name + '.VLN100maf.bed.gz','wb')
+f3 = gzip.open(name + '.VLN100mean_maf.bed.gz','wb')
+f4 = gzip.open(name + '.VLN100median_maf.bed.gz','wb')
 # rolls through file and groups by key (lambda function)
 # you can then process all data in the group/chunk
-for key, chunk in groupby(fileinput.input(), lambda x: x.split()[3]):
+
+file = args.loj_file
+
+for key, chunk in groupby(file, lambda x: x.split()[3]):
 		
 	chunk = list(chunk)
 	num_of_var = len(chunk)
