@@ -5,10 +5,13 @@ import fileinput
 import re
 import sqlite3
 import statistics
+import operator
 
 """
 Coded for the ensembl v85 targeted variations (approach 2). Will take the loj
 file as input (through pipe) created with bedtools intersect with -loj and -sorted.
+
+Requires the input to have CHR_POS_REF_ALT in the vcf 'ID' position
 
 Outputs a vcf with four custom tags (see below for details) for each of the ensembl
 variants to stdout
@@ -24,17 +27,23 @@ print('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO')
 # rolls through file and groups by key (lambda function)
 # you can then process all data in the group/chunk
 for key, chunk in groupby(fileinput.input(), lambda x: x.split()[3]):
-		
+	
 	chunk = list(chunk)
 	try:
-		#[s for s in chunk if key == \
-		#	(s.split('\t')[4]+'_'+ s.split('\t')[5]+'_'+ \
-		#	s.split('\t')[6]+'_'+ s.split('\t')[7])][0]:
+		# this horrifying list comprehension does the following:
+		# for each piece of the chunk (grouped by the key) we check if the key,
+		# which is CHR_POS_REF_ALT matches the derived key (the itemgetter part)
+		# which makes CHR_POS_REF_ALT for the loj file
+		# then the rs1242134whatever is grabbed
+		rs = [s.split('\t')[6] for s in chunk if key == '_'.join(operator.itemgetter(4,5,7,8)(s.split('\t'))) ][0]
 		num_of_var = len(chunk)-1
+		# new chunk without overlapping variant
+		chunk = [s for s in chunk if key != '_'.join(operator.itemgetter(4,5,7,8)(s.split('\t'))) ]
 	except:
 		num_of_var = len(chunk)
+		rs = '.'
 	vcf_info = key.split('_')
-	vcf_info.insert(2,'.')
+	vcf_info.insert(2,rs)
 	vcf_info.append('\t.\t.')
 	vcf_info = '\t'.join(vcf_info)
 
