@@ -1,5 +1,4 @@
-#!/usr/local/bin/python3
-##!/usr/local/Anaconda/envs/py3.4.3/bin/python
+#!/usr/local/Anaconda/envs/py3.4.3/bin/python
 
 from itertools import groupby
 import fileinput
@@ -27,15 +26,17 @@ print('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO')
 for key, chunk in groupby(fileinput.input(), lambda x: x.split()[3]):
 		
 	chunk = list(chunk)
-	num_of_var = len(chunk)-1
-	chunk_bit = [s for s in chunk if key in s.split('\t')[6]][0]
-	chunk_bit = chunk_bit.split('\t')
-	chr = chunk_bit[0]
-	pos = int( (int(chunk_bit[1]) + int(chunk_bit[2])) / 2)
-	id = chunk_bit[3]
-	ref = chunk_bit[7]
-	alt = chunk_bit[8]
-	vcf_info = str(chr) + '\t' + str(pos) + '\t' + id + '\t' + ref + '\t' + alt + '\t.\t.'
+	try:
+		#[s for s in chunk if key == \
+		#	(s.split('\t')[4]+'_'+ s.split('\t')[5]+'_'+ \
+		#	s.split('\t')[6]+'_'+ s.split('\t')[7])][0]:
+		num_of_var = len(chunk)-1
+	except:
+		num_of_var = len(chunk)
+	vcf_info = key.split('_')
+	vcf_info.insert(2,'.')
+	vcf_info.append('\t.\t.')
+	vcf_info = '\t'.join(vcf_info)
 
 	chunk = ';'.join(chunk)
 	regex=re.compile(r'MAF=0\.\d+', re.I) # regex pattern to find the maf
