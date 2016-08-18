@@ -5,13 +5,13 @@ Question: Does looking at the amount of known variation around a given variant i
 
 Two angles are being taken right now for the project:
 
-1. Labeling each base pair of all known transcripts
+1. Labeling each base pair of all known transcripts for GRCh37 and GRCh38
 2. Annotation of known variation
 
 Angle 1:
-Using the Gencode v25 annotation (gtf) file (see https://github.com/davemcg/human_variation_landscape/blob/master/01_initial_processing.sh for details), I convert it to a bed file, then keep the transcript coordiantes. Then I increase in each direction by 1000 base pairs, then merge overlapping transcripts together. 100bp windows, stepping by 1bp are created across the transcript coordinates. 
+Using the Gencode v25 or v25lift37 annotation (gtf) file (see https://github.com/davemcg/human_variation_landscape/blob/master/01_initial_processing.sh for details), I convert it to a bed file, then keep the transcript coordiantes. Then I increase in each direction by 1000 base pairs, then merge overlapping transcripts together. 100bp windows, stepping by 1bp are created across the transcript coordinates. 
 
-OK, so this new bed file is then left outer joined (loj) with release 85 of Ensembl's Homo_sapiens_incl_consequences.vcf.gz. A custom script is used (https://github.com/davemcg/human_variation_landscape/blob/master/scripts/loj_groupby_gw.py) to collapse the loj file and calculate four things: 
+OK, so this new bed file is then left outer joined (loj) with release 85 (GRCh38) or release 83 (GRCh37) of Ensembl's Homo_sapiens_incl_consequences.vcf.gz. A custom script is used (https://github.com/davemcg/human_variation_landscape/blob/master/scripts/loj_groupby_gw.py) to collapse the loj file and calculate four things: 
 
 - number of variants in a 100bp window around each base pair
 - number of variants with a MAF
