@@ -3,7 +3,6 @@
 from itertools import groupby
 import fileinput
 import re
-import gzip
 import statistics
 import argparse
 from argparse import RawTextHelpFormatter
@@ -36,10 +35,10 @@ args = parser.parse_args()
 name = args.name
 
 # Create files to write to
-f1 = gzip.open(name + '.VLN100.bed.gz','wb')
-f2 = gzip.open(name + '.VLN100maf.bed.gz','wb')
-f3 = gzip.open(name + '.VLN100mean_maf.bed.gz','wb')
-f4 = gzip.open(name + '.VLN100median_maf.bed.gz','wb')
+f1 = open(name + '.VLN100.bed','wb')
+f2 = open(name + '.VLN100maf.bed','wb')
+f3 = open(name + '.VLN100mean_maf.bed','wb')
+f4 = open(name + '.VLN100median_maf.bed','wb')
 # rolls through file and groups by key (lambda function)
 # you can then process all data in the group/chunk
 
@@ -67,10 +66,10 @@ for key, chunk in groupby(file, lambda x: x.split()[3]):
 		mean_maf = sum(maf) / len(maf)		
 		median_maf = statistics.median(maf)
 	#print(chr,pos-1,pos,id, num_of_var, number_of_maf, mean_maf, median_maf)
-	f1_data = chr + ' ' + str(pos-1) + ' ' + str(pos) + ' ' + id + ' ' + str(num_of_var) + '\n'
-	f2_data = chr + ' ' + str(pos-1) + ' ' + str(pos) + ' ' + id + ' ' + str(number_of_maf) + '\n'
-	f3_data = chr + ' ' + str(pos-1) + ' ' + str(pos) + ' ' + id + ' ' + str(mean_maf) + '\n'
-	f4_data = chr + ' ' + str(pos-1) + ' ' + str(pos) + ' ' + id + ' ' + str(median_maf) + '\n'
+	f1_data = chr + '\t' + str(pos-1) + '\t' + str(pos) + '\t' + id + '\t' + str(num_of_var) + '\n'
+	f2_data = chr + '\t' + str(pos-1) + '\t' + str(pos) + '\t' + id + '\t' + str(number_of_maf) + '\n'
+	f3_data = chr + '\t' + str(pos-1) + '\t' + str(pos) + '\t' + id + '\t' + str(mean_maf) + '\n'
+	f4_data = chr + '\t' + str(pos-1) + '\t' + str(pos) + '\t' + id + '\t' + str(median_maf) + '\n'
 
 	f1.write(bytes(f1_data, 'UTF-8'))
 	f2.write(bytes(f2_data, 'UTF-8'))
