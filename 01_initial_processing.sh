@@ -21,7 +21,7 @@ cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/
 # download it. v25 latest as of 2016-08-17
 wget ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_25/gencode.v25.annotation.gtf.gz
 gunzip gencode.v25.annotation.gtf.gz
-gtf2bed < gencode.v25.annotation.gtf > gencode.v25.annotation.bed
+gtf2bed --do-not-sort < gencode.v25.annotation.gtf > gencode.v25.annotation.bed
 gzip gencode.v25.annotation.gtf
 gzip gencode.v25.annotation.bed
 zcat gencode.v25.annotation.bed.gz| awk '$8 == "transcript" {print $0}' | gzip -f > gencode.v25.annotation.transcriptsOnly.bed.gz #only keep transcripts
@@ -38,18 +38,20 @@ cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape
 # on the number of variants in the 100bp vicinity
     # increase each transcript size by 1000 in each direction then merge overlapping transcripts
     bedtools slop -g /data/mcgaugheyd/genomes/GRCh38/hg38.chrom.sizes -b 1000 -i gencode.v25.annotation.transcriptsOnly.bed.gz | \
-    # ensure sort is correct
-    sort -k1,1 -k2,2n | \
+	# get chr pos sort 
+	sort -k1,1 -k2,2n | \
     # merge overlaps
     bedtools merge -i - | \
     # convert gencode to ensembl chr notation (chr1 to 1)
     ~/git/ChromosomeMappings/./convert_notation.py -c ~/git/ChromosomeMappings/GRCh38_gencode2ensembl.txt -f - | \
-    # create 100bp windows, sliding by one
+	# get chr sort correct for new naming
+	sort -k1,1 -k2,2n | \
+	 # create 100bp windows, sliding by one
     bedtools makewindows -b - -w 100 -s 1  | \
     # create ID
     awk -v OFS='\t' '{key=$1"_"$2"_"$3; print $1, $2, $3, key}' | \
     # loj back onto the ensembl variation file
-    bedtools intersect -b /data/mcgaugheyd/genomes/GRCh37/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted | \
+    bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted | \
     ~/git/human_variation_landscape/scripts/loj_groupby_gw.py -n Gencode_v25_Ensembl_v85 -l -
 
 
@@ -69,7 +71,7 @@ cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/GRCh37
 # grab GRCh37 gencode genes
 wget ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_25/GRCh37_mapping/gencode.v25lift37.annotation.gtf.gz
 gunzip gencode.v25lift37.annotation.gtf.gz
-gtf2bed < gencode.v25lift37.annotation.gtf > gencode.v25lift37.annotation.bed #convert gtf to bed
+gtf2bed --do-not-sort < gencode.v25lift37.annotation.gtf > gencode.v25lift37.annotation.bed #convert gtf to bed
 # compress again
 gzip gencode.v25lift37.annotation.gtf
 gzip gencode.v25lift37.annotation.bed
@@ -81,13 +83,15 @@ zcat gencode.v25lift37.annotation.bed.gz| awk '$8 == "transcript" {print $0}' | 
 # on the number of variants in the 100bp vicinity
     # increase each transcript size by 1000 in each direction then merge overlapping transcripts
     bedtools slop -g /data/mcgaugheyd/genomes/GRCh37/GRCh37.gencode.chrom.sizes -b 1000 -i gencode.v25lift37.annotation.transcriptsOnly.bed.gz | \
-    # ensure sort is correct
-    sort -k1,1 -k2,2n | \
+	# get chr pos sorted
+	sort -k1,1 -k2,2n | \
     # merge overlaps
     bedtools merge -i - | \
     # convert gencode to ensembl chr notation (chr1 to 1)
     ~/git/ChromosomeMappings/./convert_notation.py -c ~/git/ChromosomeMappings/GRCh37_gencode2ensembl.txt -f - | \
-    # create 100bp windows, sliding by one
+ 	# ensure sort is correct for new chr naming
+	sort -k1,1 -k2,2n | \    
+	# create 100bp windows, sliding by one
     bedtools makewindows -b - -w 100 -s 1  | \
     # create ID
     awk -v OFS='\t' '{key=$1"_"$2"_"$3; print $1, $2, $3, key}' | \
