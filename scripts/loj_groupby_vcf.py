@@ -18,10 +18,11 @@ variants to stdout
 
 """
 # print VCF header
+print('##fileformat=VCFv4.1')
 print('##INFO=<ID=VLN100,Number=1,Type=Integer,Description="Number of known variants within 100bp of this variant">')
 print('##INFO=<ID=VLN100maf,Number=1,Type=Integer,Description="Number of known variants within 100bp of this variant that have a MAF">')
 print('##INFO=<ID=VLN100mean_maf,Number=A,Type=Float,Description="Mean MAF of variants within 100bp">')
-print('##INFO=<ID=VLN100median_maf,Number=1,Type=Integer,Description="Median MAF of variants within 100bp">')
+print('##INFO=<ID=VLN100median_maf,Number=A,Type=Float,Description="Median MAF of variants within 100bp">')
 print('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO')
 
 # rolls through file and groups by key (lambda function)
@@ -44,7 +45,7 @@ for key, chunk in groupby(fileinput.input(), lambda x: x.split()[3]):
 		rs = '.'
 	vcf_info = key.split('_')
 	vcf_info.insert(2,rs)
-	vcf_info.append('\t.\t.')
+	vcf_info.append('.\t.')
 	vcf_info = '\t'.join(vcf_info)
 
 	chunk = ';'.join(chunk)
