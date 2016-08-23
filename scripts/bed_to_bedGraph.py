@@ -22,4 +22,5 @@ for key, chunk in groupby(fileinput.input(), lambda x: x.split()[0] + x.split()[
 	stop = chunk[-1].split()[2]
 	new_key = chr + '_' + start + '_' + stop
 	value = chunk[0].split()[4]
-	print(chr, start, stop, new_key, value)
+	out = chr + '\t' + start + '\t' + stop + '\t' + new_key + '\t' + value
+	print(out)
