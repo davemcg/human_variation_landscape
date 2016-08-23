@@ -1,9 +1,12 @@
+## Notes on how ExAC calculated their gene-level Z-scores.
+
+### Sources
 http://www.nature.com/nature/journal/v536/n7616/extref/nature19057-s1.pdf
 - ExAC paper supplement
 http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4222185/
 - Daly paper used as basis for ExAC Z-score calculation
 
-Notes on how ExAC calculated their gene-level Z-scores.
+
 
 At the most basic level, this is a test of observed vs expected number of variants at the gene-level. 
 But like everything, it is VERY complicated to do properly. You should try to control for the following stuff:
