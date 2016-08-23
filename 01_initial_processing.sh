@@ -51,7 +51,7 @@ cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape
     # create ID
     awk -v OFS='\t' '{key=$1"_"$2"_"$3; print $1, $2, $3, key}' | \
     # loj back onto the ensembl variation file
-    bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted | \
+    bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted -g /data/mcgaugheyd/genomes/GRCh38/GRCh38.ensembl.k11sort.chrom.sizes | \
     ~/git/human_variation_landscape/scripts/loj_groupby_gw.py -n Gencode_v25_Ensembl_v85 -l -
 
 
@@ -96,7 +96,7 @@ zcat gencode.v25lift37.annotation.bed.gz| awk '$8 == "transcript" {print $0}' | 
     # create ID
     awk -v OFS='\t' '{key=$1"_"$2"_"$3; print $1, $2, $3, key}' | \
     # loj back onto the ensembl variation file
-    bedtools intersect -b /data/mcgaugheyd/genomes/GRCh37/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted |
+    bedtools intersect -b /data/mcgaugheyd/genomes/GRCh37/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted -g /data/mcgaugheyd/genomes/GRCh37/GRCh37.ensembl.k11_sort.chrom.sizes |
     ~/git/human_variation_landscape/scripts/loj_groupby_gw.py -n Gencode_v25lift37_Ensembl_v83 -l -
 
 
