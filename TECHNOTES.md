@@ -7,19 +7,20 @@ Notes on how ExAC calculated their gene-level Z-scores.
 
 At the most basic level, this is a test of observed vs expected number of variants at the gene-level. 
 But like everything, it is VERY complicated to do properly. You should try to control for the following stuff:
+
 1. Sequencing depth
-..* ExAC uses a median depth >50 at the exon level
-..* For exons with <50 median, they calculated a regression using synonymous variants against depth
+  * ExAC uses a median depth >50 at the exon level
+  * For exons with <50 median, they calculated a regression using synonymous variants against depth
 2. Divergence of region from primates
-..* Hellmann, I. et al. Why do human diversity levels vary at a megabase scale? Genome Research 15, 1222- 1231 (2005).
+  * Hellmann, I. et al. Why do human diversity levels vary at a megabase scale? Genome Research 15, 1222- 1231 (2005).
 3. Type of mutation
-..* Synonymous, misssense, truncating
-..* I am using missense-only right now
-..* But should use synonymous-only as a control of sorts?
+  * Synonymous, misssense, truncating
+  * I am using missense-only right now
+  * But should use synonymous-only as a control of sorts?
 4. Filtering. ExAC: "For this paper, we focus on the canonical transcript as defined by Ensembl v75 for each protein-coding gene and drop all transcripts that do not begin with a methionine, end with a stop codon, or whose length are not divisible by three."
 5. Outliers
-..* Should ID weird windowns and just toss them
-..* I def have some windows with HUGE >100 variants
+  * Should ID weird windowns and just toss them
+  * I def have some windows with HUGE >100 variants
 
 This is how Samocha/Daly describe their approach:
 
