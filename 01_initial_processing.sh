@@ -2,6 +2,26 @@
 module load bedtools
 module load bedops
 
+# get Ensembl's GRCh38 v85 (latest as of 2016-08-17)  human variation file
+cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/GRCh38
+wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz
+wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz.tbi
+
+
+# keep only coding variation
+cat <(zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | head -n 1000 | grep ^#) <(zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | grep 'frameshift_variant\|inframe\|missense_variant\|start_lost\|stop_gained\|stop_lost\|synonymous_variant') | bgzip > /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.vcf
+tabix -p vcf /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.vcf
+# annotate with VEP/84, adding MAF from 1000G, ESP, ExAC as well as gene coding positions
+sbatch --cpus-per-task 16 ~/git/human_variation_landscape/run_VEP.sh /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.vcf GRCh38 16
+
+
+
+
+
+
+
+
+
 #####
 # two (three) paths: 1 (1_sub) and 2
 # 1 is to calculate amount of human variation in all transcripts/genes. 100bp windows. Sliding by 1bp.
@@ -24,33 +44,31 @@ gunzip gencode.v25.annotation.gtf.gz
 gtf2bed --do-not-sort < gencode.v25.annotation.gtf > gencode.v25.annotation.bed
 gzip gencode.v25.annotation.gtf
 gzip gencode.v25.annotation.bed
-zcat gencode.v25.annotation.bed.gz| awk '$8 == "transcript" {print $0}' | gzip -f > gencode.v25.annotation.transcriptsOnly.bed.gz #only keep transcripts
 
 # get Ensembl's GRCh38 v85 (latest as of 2016-08-17)  human variation file
 cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/GRCh38
 wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz
 wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz.tbi
 
-# move back to project location on biowulf2
-cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape
-
 # set of piped commands to process the annotation info and create four bed files with 100bp windows (1bp steps) for stats
 # on the number of variants in the 100bp vicinity
-    # increase each transcript size by 1000 in each direction then merge overlapping transcripts
-    bedtools slop -g /data/mcgaugheyd/genomes/GRCh38/hg38.chrom.sizes -b 1000 -i gencode.v25.annotation.transcriptsOnly.bed.gz | \
+	# first parse the gencode data to keep exons from canonical ('basic') protein-coding trancripts
+	# 2016-08-23, 19950 transcripts and 834420 exons
+	zcat gencode.v25.annotation.bed.gz | awk '$8=="exon" || $8=="start_codon" || $8=="stop_codon" || $8=="UTR" {print $0}' | \
+	grep -i 'tag \"basic\"' | grep -i 'gene_type \"protein_coding\"' | \
+    # increase each exon by 50bp each direction
+    bedtools slop -g /data/mcgaugheyd/genomes/GRCh38/hg38.chrom.sizes -b 50 -i - | \
 	# get chr pos sort 
 	sort -k1,1 -k2,2n | \
-    # merge overlaps
-    bedtools merge -i - | \
+    # merge overlaps and pull the gene name
+    bedtools merge -i - -c 4 -o distinct  | \
     # convert gencode to ensembl chr notation (chr1 to 1)
     ~/git/ChromosomeMappings/./convert_notation.py -c ~/git/ChromosomeMappings/GRCh38_gencode2ensembl.txt -f - | \
 	# get chr sort correct for new naming
 	sort -k1,1 -k2,2n | \
-	 # create 100bp windows, sliding by one
-    bedtools makewindows -b - -w 100 -s 1  | \
-    # create ID
-    awk -v OFS='\t' '{key=$1"_"$2"_"$3; print $1, $2, $3, key}' | \
-    # loj back onto the ensembl variation file
+	# create 100bp windows, sliding by one, retain gene name
+    bedtools makewindows -b - -w 100 -s 1 -i src | \
+    #loj back onto the ensembl variation file
     bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted -g /data/mcgaugheyd/genomes/GRCh38/GRCh38.ensembl.k11sort.chrom.sizes | \
     ~/git/human_variation_landscape/scripts/loj_groupby_gw.py -n Gencode_v25_Ensembl_v85 -l -
 
