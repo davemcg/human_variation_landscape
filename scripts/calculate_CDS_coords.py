@@ -27,6 +27,7 @@ variant_data = open('/data/mcgaugheyd/projects/nei/mcgaughey/human_variation_lan
 # use dropwhile iterator to skip lines staring with #
 for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 	# group on transcript name. File MUST BE SORTED BY transcript name
+	# if not, then things will go TERRIBLY WRONG!!!!!!!!!!!!!!
 	for key, chunk in groupby(variant_data, lambda x: x.split()[4]):
 		chunk = list(chunk)
 		coding_pos = [x.split()[8].split('/')[0] for x in chunk]
@@ -43,13 +44,14 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 			else:
 				x = int(x)
 				int_coding.append(x)
+		strand = chunk[0].split()[6]
 		tx_length = chunk[0].split()[8].split('/')[1]
 		# skip should the transcript not pass the requirements set in the initial pipe for
 		# gencode (protein coding, canonical, etc.)
 		if key not in tx_gene_coords:
 			continue
 		# skip transcripts < 100 bp
-		if tx_length < 100:
+		if int(tx_length) < 100:
 			continue
 		exon_coords = tx_gene_coords[key][1:]
 		gene_name = tx_gene_coords[key][0]
@@ -59,9 +61,12 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 		exon_coords = [x[1:3] for x in exon_coords]
 		# convert to integer
 		exon_coords = [[int(pos) for pos in x] for x in exon_coords]
-		# add shift start and stop positions to add start and stop codon (not in CDS)
-		exon_coords[0][0] -= 3
-		exon_coords[-1][1] += 3
+		exon_coords = sorted(exon_coords)
+		# shift stop positions by 3 to include stop codon (which CDS doesn't not include)
+		if strand == '+':	
+			exon_coords[-1][1] += 3
+		if strand == '-':
+			exon_coords[0][0] -= 3
 		# prep for offset calcs
 		exon_coords.insert(0,[1,1])
 		# calculate offsets for each exon coordinate set
@@ -76,30 +81,27 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 		shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)] 
 		
 		######
-		# build 100bp windows, shifted by 1bp and calculate number of variats in the window	
+		# build 100bp windows, shifted by 1bp and calculate number of variants in the window	
 		######
-		for i in range(50,int(tx_length)+1-50):
-			overlapping_num = str( sum( [i-50 <= pos <= i+50 for pos in int_coding if pos] ) )
+		for i in range(1,int(tx_length)+1):
+			windowDown = -50
+			windowUp = 50
+			# fix if window is outside transcript
+			if i < windowDown:
+				windowDown = -i
+			if i > windowUp:
+				windowUp = i-1
+			interval_size = windowUp - windowDown
+			# calc number of variants in the window
+			overlapping_num = sum( [i+windowDown <= pos <= i+windowUp for pos in int_coding if pos] ) 
+			# scale for interval size
+			overlapping_num = str( round( overlapping_num * (100/interval_size) ) )
 			# calculate actual coordinate by seeing which (shifted) exon i is in
 			exon_offset_index = [x[0] for x in enumerate(shifted_exon_coords) if i in range(x[1][0],x[1][1])]
+			print(gene_name, exon_offset_index, shifted_exon_coords)
 			# now can use the index, with the offset info to calc actual genomic position
 			real_genomic_position = str(i + offsets[int(exon_offset_index[0])])
-			print(chromosome + '\t' + real_genomic_position + '\t' + overlapping_num + '\t' + gene_name)
+			print(chromosome + '\t' + real_genomic_position + '\t' + overlapping_num + '\t' + gene_name + '\t' + 
+					'\t' + key + '\t' + str(sorted(exon_coords)[0][0]) + '\t' + str(sorted(exon_coords)[-1][1]))
 			
 	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
