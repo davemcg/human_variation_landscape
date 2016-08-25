@@ -109,6 +109,6 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 					str(real_genomic_position + 1) + '\t' + \
 					gene_name + '_' + key + '\t' + overlapping_num + '\t' + strand)
 			except:			
-				out = gene_name + ' ' +  strand + ' ' +  tx_length + ' ' + i + ' ' + exon_offset_index + ' ' + shifted_exon_coords
+				out = gene_name + ' ' +  strand + ' ' +  str(tx_length) + ' ' + str(i) + ' ' + str(exon_offset_index) + ' ' + str(shifted_exon_coords)
 				errors.write(out)	
 	
