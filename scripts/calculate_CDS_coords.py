@@ -17,7 +17,9 @@ for key, chunk in groupby(fileinput.input(), lambda x: x.split('\t')[9].split(';
 	exon_coords = [element.split('\t')[0:3] for element in chunk]
 	value = []
 	gene_name = chunk[0].split('\t')[9].split('"')[9]
+	strand = chunk[0].split('\t')[5]
 	value.append(gene_name)
+	value.extend(strand)
 	value.extend(exon_coords)
 	dict_key = key.split('.')[0]	
 	tx_gene_coords[dict_key] = value
@@ -44,7 +46,6 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 			else:
 				x = int(x)
 				int_coding.append(x)
-		strand = chunk[0].split()[6]
 		tx_length = chunk[0].split()[8].split('/')[1]
 		# skip should the transcript not pass the requirements set in the initial pipe for
 		# gencode (protein coding, canonical, etc.)
@@ -53,9 +54,10 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 		# skip transcripts < 100 bp
 		if int(tx_length) < 100:
 			continue
-		exon_coords = tx_gene_coords[key][1:]
+		exon_coords = tx_gene_coords[key][2:]
 		gene_name = tx_gene_coords[key][0]
-		chromosome = tx_gene_coords[key][1][0]
+		strand = tx_gene_coords[key][1]
+		chromosome = tx_gene_coords[key][2][0]
 			
 		# remove chr from exon coords for calculations
 		exon_coords = [x[1:3] for x in exon_coords]
@@ -83,7 +85,7 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 		######
 		# build 100bp windows, shifted by 1bp and calculate number of variants in the window	
 		######
-		for i in range(1,int(tx_length)+1):
+		for i in range(1,int(tx_length)):
 			windowDown = -50
 			windowUp = 50
 			# fix if window is outside transcript
@@ -98,10 +100,11 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 			overlapping_num = str( round( overlapping_num * (100/interval_size) ) )
 			# calculate actual coordinate by seeing which (shifted) exon i is in
 			exon_offset_index = [x[0] for x in enumerate(shifted_exon_coords) if i in range(x[1][0],x[1][1])]
-			print(gene_name, exon_offset_index, shifted_exon_coords)
+			#print(gene_name, strand, tx_length, exon_offset_index, i, shifted_exon_coords)
 			# now can use the index, with the offset info to calc actual genomic position
 			real_genomic_position = str(i + offsets[int(exon_offset_index[0])])
-			print(chromosome + '\t' + real_genomic_position + '\t' + overlapping_num + '\t' + gene_name + '\t' + 
-					'\t' + key + '\t' + str(sorted(exon_coords)[0][0]) + '\t' + str(sorted(exon_coords)[-1][1]))
+			print(chromosome + '\t' + real_genomic_position + '\t' + overlapping_num + '\t' + gene_name + \
+					'\t' + key + '\t' + str(exon_coords[0][0]) + '\t' + str(exon_coords[-1][1]) + \
+					'\t' + tx_length + '\t')
 			
 	
