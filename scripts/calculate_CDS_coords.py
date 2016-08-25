@@ -24,8 +24,8 @@ for key, chunk in groupby(fileinput.input(), lambda x: x.split('\t')[9].split(';
 	dict_key = key.split('.')[0]	
 	tx_gene_coords[dict_key] = value
 
-
-variant_data = open('/data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/test.tab')
+errors = open('errors.txt','w')
+variant_data = open('/data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.k55.k22n.tab')
 # use dropwhile iterator to skip lines staring with #
 for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 	# group on transcript name. File MUST BE SORTED BY transcript name
@@ -69,6 +69,8 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 			exon_coords[-1][1] += 3
 		if strand == '-':
 			exon_coords[0][0] -= 3
+		# calculated tx size from exon_coords
+		calc_tx_size = sum([x[1]-x[0] for x in exon_coords])
 		# prep for offset calcs
 		exon_coords.insert(0,[1,1])
 		# calculate offsets for each exon coordinate set
@@ -85,26 +87,28 @@ for line in dropwhile(lambda line: line.startswith('#'), variant_data):
 		######
 		# build 100bp windows, shifted by 1bp and calculate number of variants in the window	
 		######
-		for i in range(1,int(tx_length)):
+		for i in range(1,int(tx_length)+1):
 			windowDown = -50
 			windowUp = 50
 			# fix if window is outside transcript
-			if i < windowDown:
-				windowDown = -i
-			if i > windowUp:
-				windowUp = i-1
-			interval_size = windowUp - windowDown
-			# calc number of variants in the window
+			if i < abs(windowDown):
+				windowDown = -(i-1)
+			if int(tx_length)-i <= 0:
+				windowUp = int(tx_length)-i
+			# calc number of variants in the window 
 			overlapping_num = sum( [i+windowDown <= pos <= i+windowUp for pos in int_coding if pos] ) 
 			# scale for interval size
-			overlapping_num = str( round( overlapping_num * (100/interval_size) ) )
+			overlapping_num = str( round( overlapping_num * (100/ (windowUp - windowDown)) ) )
 			# calculate actual coordinate by seeing which (shifted) exon i is in
-			exon_offset_index = [x[0] for x in enumerate(shifted_exon_coords) if i in range(x[1][0],x[1][1])]
+			exon_offset_index = [x[0] for x in enumerate(shifted_exon_coords) if i in range(x[1][0],x[1][1]+1)]
 			#print(gene_name, strand, tx_length, exon_offset_index, i, shifted_exon_coords)
 			# now can use the index, with the offset info to calc actual genomic position
-			real_genomic_position = str(i + offsets[int(exon_offset_index[0])])
-			print(chromosome + '\t' + real_genomic_position + '\t' + overlapping_num + '\t' + gene_name + \
-					'\t' + key + '\t' + str(exon_coords[0][0]) + '\t' + str(exon_coords[-1][1]) + \
-					'\t' + tx_length + '\t')
-			
+			try:
+				real_genomic_position = i + offsets[int(exon_offset_index[0])]
+				print(chromosome + '\t' + str(real_genomic_position) + '\t' + \
+					str(real_genomic_position + 1) + '\t' + \
+					gene_name + '_' + key + '\t' + overlapping_num + '\t' + strand)
+			except:			
+				out = gene_name + ' ' +  strand + ' ' +  tx_length + ' ' + i + ' ' + exon_offset_index + ' ' + shifted_exon_coords
+				errors.write(out)	
 	
