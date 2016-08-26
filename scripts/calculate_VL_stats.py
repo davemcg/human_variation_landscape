@@ -36,10 +36,17 @@ parser.add_argument('-o','--output_file_name', required=True)
 # ~/git/human_variation_landscape/scripts/calculate_CDS_coords.py
 
 class FileOperations:
-	def open_files(output_name):
-		bed_file = open(output_name,'w')
-		errors = open(
+	def open_files(self, output_name):
+		self.VL_output = open(output_name,'w')
+		self.error_output = open('errors.txt', 'w')
+		self.skipped_output = open('skipped_tx.txt', 'w')
 				
+	def writeErrors(self, info):
+		self.error_output.write(info)
+	def writeSkipped(self, info):
+		self.skipped_output.write(info)
+	def writeVL(self, info):
+		self.VL_output.write(info)
 
 def build_exon_coords(gencode_file):
 	tx_gene_coords = {}
@@ -79,9 +86,10 @@ def coding_pos_processor(coding_pos):
 			int_coding.append(x)
 	return(int_coding)
 
-def window_maker(tx_length, output, key, shifted_exon_coords, offsets, int_coding, chromosome, gene_name, strand):
-	VL_output = open(output,'w')
-	error_output = open('errors.txt', 'w')
+def window_maker(tx_length, fileHandler, key, shifted_exon_coords, offsets, int_coding, chromosome, gene_name, strand):
+#	fileHandler = FileOperations()
+#	fileHandler.open_files(output)
+	
 	######
 	# build 100bp windows, shifted by 1bp and calculate number of variants in the window	
 	######
@@ -106,14 +114,16 @@ def window_maker(tx_length, output, key, shifted_exon_coords, offsets, int_codin
 			out = (chromosome + '\t' + str(real_genomic_position) + '\t' + \
 				str(real_genomic_position + 1) + '\t' + \
 				gene_name + '_' + key + '\t' + overlapping_num + '\t' + strand + '\n')
-			VL_output.write(out)
+			fileHandler.writeVL(out)
 		except:			
 			out = gene_name + ' ' +  strand + ' ' +  str(tx_length) + ' ' + str(i) + ' ' + str(exon_offset_index) + ' ' + str(shifted_exon_coords)
-			error_output.write(out)	
+			fileHandler.writeErrors(out)	
 
 
 def calculator(variant_data, tx_gene_coords, output):
-	skipped_output = open('skipped_tx.txt', 'w')
+	fileHandler = FileOperations()
+	print(output)
+	fileHandler.open_files(output)
 
 	# group on transcript name. File MUST BE SORTED BY transcript name
 	# if not, then things will go TERRIBLY WRONG!!!!!!!!!!!!!!
@@ -130,12 +140,12 @@ def calculator(variant_data, tx_gene_coords, output):
 		# gencode (protein coding, canonical, etc.)
 		if key not in tx_gene_coords:
 			key = key + ' not in filtered gencode\n'
-			skipped_output.write(key)
+			fileHandler.writeSkipped(key)
 			continue
 		# skip transcripts < 100 bp
 		if int(tx_length) < 100:
 			key = key + ' less than 100bp long\n'
-			skipped_output.write(key)
+			fileHandler.writeSkipped(key)
 			continue
 		exon_coords = tx_gene_coords[key][2:]; gene_name = tx_gene_coords[key][0]
 		strand = tx_gene_coords[key][1]; chromosome = tx_gene_coords[key][2][0]
@@ -161,7 +171,7 @@ def calculator(variant_data, tx_gene_coords, output):
 		# can use the offets calculated to re-make the positions
 		shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)] 
 		
-		window_maker(tx_length, output, key, shifted_exon_coords, offsets, int_coding, chromosome, gene_name, strand)
+		window_maker(tx_length, fileHandler, key, shifted_exon_coords, offsets, int_coding, chromosome, gene_name, strand)
 
 # files (should create class)
 
