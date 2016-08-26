@@ -2,11 +2,13 @@
 
 from itertools import groupby
 from itertools import dropwhile
+from itertools import islice
 import fileinput
 from collections import defaultdict
 import argparse
 from argparse import RawTextHelpFormatter
 import gzip
+import numpy as np
 
 parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description= \
@@ -37,7 +39,8 @@ parser.add_argument('-o','--output_file_name', required=True)
 
 class FileOperations:
 	def open_files(self, output_name):
-		self.VL_output = open(output_name,'w')
+		self.VLall = open(output_name+'.VLall.bed','w')
+		self.VLmoderate = open(output_name+'.VLmoderate.bed','w')
 		self.error_output = open('errors.txt', 'w')
 		self.skipped_output = open('skipped_tx.txt', 'w')
 				
@@ -45,11 +48,15 @@ class FileOperations:
 		self.error_output.write(info)
 	def writeSkipped(self, info):
 		self.skipped_output.write(info)
-	def writeVL(self, info):
-		self.VL_output.write(info)
+	def writeVLall(self, info):
+		self.VLall.write(info)
+		self.VLall.write('\n')
+	def writeVLmoderate(self, info):
+		self.VLmoderate.write(info)
+		self.VLall.write('\n')
 
 	def close_files(self):
-		self.VL_output.close()
+		self.VLall.close()
 		self.error_output.close()
 		self.skipped_output.close()
 
@@ -118,16 +125,25 @@ def exon_processor(exon_coords, strand):
 	
 	# calculate new exon coords from 1 to len(transcript) continuously
 	# can use the offets calculated to re-make the positions
-	shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)] 
+	shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)]
 	return(shifted_exon_coords, offsets)
 
-def window_maker(tx_length, fileHandler, key, exon_coords, coding_pos, chromosome, gene_name, strand):
+def window_calc_print(tx_length, \
+						fileHandler, \
+						key, \
+						exon_coords, \
+						coding_pos, \
+						chromosome, \
+						gene_name, \
+						strand, \
+						index_to_keep):
 	# build 100bp windows, shifted by 1bp and calculate number of variants in the window	
 	# prints data to file
 	
 	# remove chr, make numeric, adjust stop coordinate, calculate offsets, shifts the exon coordinates
 	shifted_exon_coords, offsets = exon_processor(exon_coords, strand) 
 	
+	output = []
 	for i in range(1,int(tx_length)+1):
 		windowDown = -50
 		windowUp = 50
@@ -136,6 +152,9 @@ def window_maker(tx_length, fileHandler, key, exon_coords, coding_pos, chromosom
 			windowDown = -(i-1)
 		if int(tx_length)-i <= 0:
 			windowUp = int(tx_length)-i
+		# only keep variants that meet a certain criteria
+		coding_pos = np.array(coding_pos)
+		coding_pos = list(coding_pos[index_to_keep])
 		# calc number of variants in the window 
 		overlapping_num = sum( [i+windowDown <= pos <= i+windowUp for pos in coding_pos if pos] ) 
 		# scale for interval size
@@ -148,50 +167,89 @@ def window_maker(tx_length, fileHandler, key, exon_coords, coding_pos, chromosom
 			real_genomic_position = i + offsets[int(exon_offset_index[0])]
 			out = (chromosome + '\t' + str(real_genomic_position) + '\t' + \
 				str(real_genomic_position + 1) + '\t' + \
-				gene_name + '_' + key + '\t' + overlapping_num + '\t' + strand + '\n')
+				gene_name + '_' + key + '\t' + overlapping_num + '\t' + strand)
 		except:			
 			out = gene_name + ' ' +  strand + ' ' +  str(tx_length) + ' ' + str(i) + ' ' + str(exon_offset_index) + ' ' + str(shifted_exon_coords)
 			fileHandler.writeErrors(out)	
-	
-		fileHandler.writeVL(out)
+			continue
 
+		output.append(out)
+	return(output)
+
+	
 def calculator(variant_data, tx_gene_coords, output):
 	fileHandler = FileOperations()
 	fileHandler.open_files(output)
-
-	# group on transcript name. File MUST BE SORTED BY transcript name
-	# if not, then things will go TERRIBLY WRONG!!!!!!!!!!!!!!
-	for key, chunk in groupby(variant_data, lambda x: x.split()[4]):
-		chunk = list(chunk)
-		# creates list of coding sequence positions of all variants in the gene
-		# then coding_pos_processor:
-		# convert to int and handle cases where the sequence is a range (e.g 67-70) 
-		coding_pos = coding_pos_processor([x.split()[8].split('/')[0] for x in chunk])
-
-
-		tx_length = chunk[0].split()[8].split('/')[1]
-		# skip should the transcript not pass the requirements set in the initial pipe for
-		# gencode (protein coding, canonical, etc.)
-		if key not in tx_gene_coords:
-			key = key + ' not in filtered gencode\n'
-			fileHandler.writeSkipped(key)
-			continue
-		# skip transcripts < 100 bp
-		if int(tx_length) < 100:
-			key = key + ' less than 100bp long\n'
-			fileHandler.writeSkipped(key)
-			continue
+	# grab header
+	top_line = []
+	for line in islice(variant_data, 200):
+		top_line.append(line[:-1])
+	header = ([x for x in top_line if x[0:19]=='#Uploaded_variation'])[0]
+	cds_index = ([x[0] for x in enumerate(header.split('\t')) if x[1] == 'CDS_position'])[0]
+	gmaf_index = ([x[0] for x in enumerate(header.split('\t')) if x[1] == 'GMAF'])[0]
+	impact_index = ([x[0] for x in enumerate(header.split('\t')) if x[1] == 'IMPACT'])[0]
+	consequence_index = ([x[0] for x in enumerate(header.split('\t')) if x[1] == 'Consequence'])[0]
 	
-		# grab exon coordinates and strand from the tx_gene_coords dictionary
-		exon_coords = tx_gene_coords[key][2:]; gene_name = tx_gene_coords[key][0]
-		strand = tx_gene_coords[key][1]; chromosome = tx_gene_coords[key][2][0]
-		# remove chr, make numeric, adjust stop coordinate, calculate offsets, shifts the exon coordinates
-		shifted_exon_coords, offsets = exon_processor(exon_coords, strand)	
-		
-		# this does all the math
-		window_maker(tx_length, fileHandler, key, exon_coords, coding_pos, chromosome, gene_name, strand)
-
-	fileHandler.close_files()
+	# skip header lines
+	for line in dropwhile(lambda line: line.startswith('#'), variant_data):	
+		# group on transcript name. File MUST BE SORTED BY transcript name
+		# if not, then things will go TERRIBLY WRONG!!!!!!!!!!!!!!
+		for key, chunk in groupby(variant_data, lambda x: x.split()[4]):
+			chunk = list(chunk)
+			# creates list of coding sequence positions of all variants in the gene
+			# then coding_pos_processor:
+			# convert to int and handle cases where the sequence is a range (e.g 67-70) 
+			coding_pos = coding_pos_processor([x.split('\t')[cds_index].split('/')[0] for x in chunk])
+			gmaf = [x.split('\t')[gmaf_index] for x in chunk]
+			impact = [x.split('\t')[impact_index] for x in chunk]
+			consequence = [x.split('\t')[consequence_index] for x in chunk]
+			moderate_impact_index = [x[0] for x in enumerate(impact) if x[1] == 'MODERATE']
+			
+			tx_length = chunk[0].split()[cds_index].split('/')[1]
+			# skip should the transcript not pass the requirements set in the initial pipe for
+			# gencode (protein coding, canonical, etc.)
+			if key not in tx_gene_coords:
+				key = key + ' not in filtered gencode\n'
+				fileHandler.writeSkipped(key)
+				continue
+			# skip transcripts < 100 bp
+			if int(tx_length) < 100:
+				key = key + ' less than 100bp long\n'
+				fileHandler.writeSkipped(key)
+				continue
+	
+			# grab exon coordinates and strand from the tx_gene_coords dictionary
+			exon_coords = tx_gene_coords[key][2:]; gene_name = tx_gene_coords[key][0]
+			strand = tx_gene_coords[key][1]; chromosome = tx_gene_coords[key][2][0]
+			# remove chr, make numeric, adjust stop coordinate, calculate offsets, shifts the exon coordinates
+			shifted_exon_coords, offsets = exon_processor(exon_coords, strand)	
+			
+			# this does all the math and prints
+			# first all variants
+			index_to_keep = list(range(0,len(coding_pos)-1))
+			out = gene_name + ' ' + str(index_to_keep) + ' ' + str(coding_pos) + ' ' + tx_length
+			print(out)
+			VLall=window_calc_print(tx_length, \
+								fileHandler, \
+								key, \
+								exon_coords, \
+								coding_pos, \
+								chromosome, \
+								gene_name, \
+								strand, \
+								index_to_keep)
+			fileHandler.writeVLall('\n'.join(VLall))
+			# now just print out the number of surrounding moderate alleles
+			VLmoderate=window_calc_print(tx_length, \
+								fileHandler, \
+								key, \
+								exon_coords, \
+								coding_pos, \
+								chromosome, \
+								gene_name, \
+								strand, \
+								moderate_impact_index)
+		fileHandler.close_files()
 
 
 def main():
