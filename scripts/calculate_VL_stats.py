@@ -121,11 +121,13 @@ def exon_processor(exon_coords, strand):
 	shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)] 
 	return(shifted_exon_coords, offsets)
 
-def window_maker(tx_length, fileHandler, key, shifted_exon_coords, offsets, int_coding, chromosome, gene_name, strand):
-	
-	######
+def window_maker(tx_length, fileHandler, key, exon_coords, coding_pos, chromosome, gene_name, strand):
 	# build 100bp windows, shifted by 1bp and calculate number of variants in the window	
-	######
+	# prints data to file
+	
+	# remove chr, make numeric, adjust stop coordinate, calculate offsets, shifts the exon coordinates
+	shifted_exon_coords, offsets = exon_processor(exon_coords, strand) 
+	
 	for i in range(1,int(tx_length)+1):
 		windowDown = -50
 		windowUp = 50
@@ -135,7 +137,7 @@ def window_maker(tx_length, fileHandler, key, shifted_exon_coords, offsets, int_
 		if int(tx_length)-i <= 0:
 			windowUp = int(tx_length)-i
 		# calc number of variants in the window 
-		overlapping_num = sum( [i+windowDown <= pos <= i+windowUp for pos in int_coding if pos] ) 
+		overlapping_num = sum( [i+windowDown <= pos <= i+windowUp for pos in coding_pos if pos] ) 
 		# scale for interval size
 		overlapping_num = str( round( overlapping_num * (100/ (windowUp - windowDown)) ) )
 		# calculate actual coordinate by seeing which (shifted) exon i is in
@@ -147,11 +149,11 @@ def window_maker(tx_length, fileHandler, key, shifted_exon_coords, offsets, int_
 			out = (chromosome + '\t' + str(real_genomic_position) + '\t' + \
 				str(real_genomic_position + 1) + '\t' + \
 				gene_name + '_' + key + '\t' + overlapping_num + '\t' + strand + '\n')
-			fileHandler.writeVL(out)
 		except:			
 			out = gene_name + ' ' +  strand + ' ' +  str(tx_length) + ' ' + str(i) + ' ' + str(exon_offset_index) + ' ' + str(shifted_exon_coords)
 			fileHandler.writeErrors(out)	
-
+	
+		fileHandler.writeVL(out)
 
 def calculator(variant_data, tx_gene_coords, output):
 	fileHandler = FileOperations()
@@ -162,9 +164,9 @@ def calculator(variant_data, tx_gene_coords, output):
 	for key, chunk in groupby(variant_data, lambda x: x.split()[4]):
 		chunk = list(chunk)
 		# creates list of coding sequence positions of all variants in the gene
-		coding_pos = [x.split()[8].split('/')[0] for x in chunk]
-		# convert to int and handle cases where the sequence is a range (e.g 67-70)
-		int_coding = coding_pos_processor(coding_pos)
+		# then coding_pos_processor:
+		# convert to int and handle cases where the sequence is a range (e.g 67-70) 
+		coding_pos = coding_pos_processor([x.split()[8].split('/')[0] for x in chunk])
 
 
 		tx_length = chunk[0].split()[8].split('/')[1]
@@ -187,7 +189,7 @@ def calculator(variant_data, tx_gene_coords, output):
 		shifted_exon_coords, offsets = exon_processor(exon_coords, strand)	
 		
 		# this does all the math
-		window_maker(tx_length, fileHandler, key, shifted_exon_coords, offsets, int_coding, chromosome, gene_name, strand)
+		window_maker(tx_length, fileHandler, key, exon_coords, coding_pos, chromosome, gene_name, strand)
 
 	fileHandler.close_files()
 
