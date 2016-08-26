@@ -48,6 +48,11 @@ class FileOperations:
 	def writeVL(self, info):
 		self.VL_output.write(info)
 
+	def close_files(self):
+		self.VL_output.close()
+		self.error_output.close()
+		self.skipped_output.close()
+
 def build_exon_coords(gencode_file):
 	tx_gene_coords = {}
 	# split on the transcript entry in the 10th column and remove the quotation marks
@@ -86,9 +91,37 @@ def coding_pos_processor(coding_pos):
 			int_coding.append(x)
 	return(int_coding)
 
+def exon_processor(exon_coords, strand):
+	# takes in list of list of exon coordinates [['chr1','100','200'],['chr1','300','600'],...]
+	# and processes to remove chr and make numeric
+	# and also adjusts end position by 3bp 
+	# finally, it calculates the offsets and and shifts the exon coords
+
+	# remove the chromosome from exon coords for calculations
+	exon_coords = [x[1:3] for x in exon_coords]
+	# convert to integer and ensure they are sorted
+	exon_coords = sorted([[int(pos) for pos in x] for x in exon_coords])
+	# shift stop positions by 3 to include stop codon (which CDS doesn't not include)
+	if strand == '+':	
+		exon_coords[-1][1] += 3
+	if strand == '-':
+		exon_coords[0][0] -= 3
+	
+	# prep for offset calcs
+	exon_coords.insert(0,[1,1])
+	# calculate offsets for each exon coordinate set
+	offsets = [0]
+	for i in range(1,len(exon_coords)):
+		the_offset = exon_coords[i][0] - exon_coords[i-1][1]
+		offsets.append(offsets[i-1]+the_offset)
+	offsets.pop(0); exon_coords.pop(0)
+	
+	# calculate new exon coords from 1 to len(transcript) continuously
+	# can use the offets calculated to re-make the positions
+	shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)] 
+	return(shifted_exon_coords, offsets)
+
 def window_maker(tx_length, fileHandler, key, shifted_exon_coords, offsets, int_coding, chromosome, gene_name, strand):
-#	fileHandler = FileOperations()
-#	fileHandler.open_files(output)
 	
 	######
 	# build 100bp windows, shifted by 1bp and calculate number of variants in the window	
@@ -122,7 +155,6 @@ def window_maker(tx_length, fileHandler, key, shifted_exon_coords, offsets, int_
 
 def calculator(variant_data, tx_gene_coords, output):
 	fileHandler = FileOperations()
-	print(output)
 	fileHandler.open_files(output)
 
 	# group on transcript name. File MUST BE SORTED BY transcript name
@@ -147,34 +179,17 @@ def calculator(variant_data, tx_gene_coords, output):
 			key = key + ' less than 100bp long\n'
 			fileHandler.writeSkipped(key)
 			continue
+	
+		# grab exon coordinates and strand from the tx_gene_coords dictionary
 		exon_coords = tx_gene_coords[key][2:]; gene_name = tx_gene_coords[key][0]
 		strand = tx_gene_coords[key][1]; chromosome = tx_gene_coords[key][2][0]
+		# remove chr, make numeric, adjust stop coordinate, calculate offsets, shifts the exon coordinates
+		shifted_exon_coords, offsets = exon_processor(exon_coords, strand)	
 		
-		# remove chr from exon coords for calculations
-		exon_coords = [x[1:3] for x in exon_coords]
-		# convert to integer and ensure they are sorted
-		exon_coords = sorted([[int(pos) for pos in x] for x in exon_coords])
-		# shift stop positions by 3 to include stop codon (which CDS doesn't not include)
-		if strand == '+':	
-			exon_coords[-1][1] += 3
-		if strand == '-':
-			exon_coords[0][0] -= 3
-		# prep for offset calcs
-		exon_coords.insert(0,[1,1])
-		# calculate offsets for each exon coordinate set
-		offsets = [0]
-		for i in range(1,len(exon_coords)):
-			the_offset = exon_coords[i][0] - exon_coords[i-1][1]
-			offsets.append(offsets[i-1]+the_offset)
-		offsets.pop(0); exon_coords.pop(0)
-		# calculate new exon coords from 1 to len(transcript) continuously
-		# can use the offets calculated to re-make the positions
-		shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)] 
-		
+		# this does all the math
 		window_maker(tx_length, fileHandler, key, shifted_exon_coords, offsets, int_coding, chromosome, gene_name, strand)
 
-# files (should create class)
-
+	fileHandler.close_files()
 
 
 def main():
