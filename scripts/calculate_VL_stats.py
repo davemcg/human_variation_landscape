@@ -8,7 +8,7 @@ from collections import defaultdict
 import argparse
 from argparse import RawTextHelpFormatter
 import gzip
-import numpy as np
+import sys
 
 parser = argparse.ArgumentParser()
 parser = argparse.ArgumentParser(description= \
@@ -53,7 +53,7 @@ class FileOperations:
 		self.VLall.write('\n')
 	def writeVLmoderate(self, info):
 		self.VLmoderate.write(info)
-		self.VLall.write('\n')
+		self.VLmoderate.write('\n')
 
 	def close_files(self):
 		self.VLall.close()
@@ -84,6 +84,8 @@ def coding_pos_processor(coding_pos):
 	# convert coding positions to int and handle coordinate range
 	# '67-70' situations
 	int_coding = []
+	index = 0
+	bad_pos = []
 	for x in coding_pos:
 		# if a range is given (e.g. 67-70, take the mean)
 		# convert all to integers, in int_coding
@@ -92,11 +94,13 @@ def coding_pos_processor(coding_pos):
 				x = int( (int(x.split('-')[0]) + int(x.split('-')[1]) ) / 2)
 				int_coding.append(x)
 			except:
-				continue
+				# need to ID the bad position
+				bad_pos.append(index)
 		else:
 			x = int(x)
 			int_coding.append(x)
-	return(int_coding)
+		index = index + 1
+	return(int_coding, bad_pos)
 
 def exon_processor(exon_coords, strand):
 	# takes in list of list of exon coordinates [['chr1','100','200'],['chr1','300','600'],...]
@@ -144,6 +148,15 @@ def window_calc_print(tx_length, \
 	shifted_exon_coords, offsets = exon_processor(exon_coords, strand) 
 	
 	output = []
+
+	# create new position list, removing nonrelevant entries
+	try:
+		coding_pos = [x for x in coding_pos if x in index_to_keep]
+	except:
+		print('Can\'t create new coding_pos list')
+		out = gene_name + '\n' + str(index_to_keep) + '\n' + str(coding_pos) + '\n' + key
+		print(out)
+		sys.exit(1)
 	for i in range(1,int(tx_length)+1):
 		windowDown = -50
 		windowUp = 50
@@ -153,8 +166,6 @@ def window_calc_print(tx_length, \
 		if int(tx_length)-i <= 0:
 			windowUp = int(tx_length)-i
 		# only keep variants that meet a certain criteria
-		coding_pos = np.array(coding_pos)
-		coding_pos = list(coding_pos[index_to_keep])
 		# calc number of variants in the window 
 		overlapping_num = sum( [i+windowDown <= pos <= i+windowUp for pos in coding_pos if pos] ) 
 		# scale for interval size
@@ -184,6 +195,7 @@ def calculator(variant_data, tx_gene_coords, output):
 	top_line = []
 	for line in islice(variant_data, 200):
 		top_line.append(line[:-1])
+	# grab header and parse for various column names
 	header = ([x for x in top_line if x[0:19]=='#Uploaded_variation'])[0]
 	cds_index = ([x[0] for x in enumerate(header.split('\t')) if x[1] == 'CDS_position'])[0]
 	gmaf_index = ([x[0] for x in enumerate(header.split('\t')) if x[1] == 'GMAF'])[0]
@@ -199,10 +211,14 @@ def calculator(variant_data, tx_gene_coords, output):
 			# creates list of coding sequence positions of all variants in the gene
 			# then coding_pos_processor:
 			# convert to int and handle cases where the sequence is a range (e.g 67-70) 
-			coding_pos = coding_pos_processor([x.split('\t')[cds_index].split('/')[0] for x in chunk])
+			coding_pos, bad_pos = coding_pos_processor([x.split('\t')[cds_index].split('/')[0] for x in chunk])
 			gmaf = [x.split('\t')[gmaf_index] for x in chunk]
 			impact = [x.split('\t')[impact_index] for x in chunk]
 			consequence = [x.split('\t')[consequence_index] for x in chunk]
+			if len(bad_pos)>0:
+				gmaf = [x[1] for x in enumerate(gmaf) if x[0] not in bad_pos]
+				impact = [x[1] for x in enumerate(impact) if x[0] not in bad_pos]
+				consequence = [x[1] for x in enumerate(consequence) if x[0] not in bad_pos]
 			moderate_impact_index = [x[0] for x in enumerate(impact) if x[1] == 'MODERATE']
 			
 			tx_length = chunk[0].split()[cds_index].split('/')[1]
@@ -226,9 +242,7 @@ def calculator(variant_data, tx_gene_coords, output):
 			
 			# this does all the math and prints
 			# first all variants
-			index_to_keep = list(range(0,len(coding_pos)-1))
-			out = gene_name + ' ' + str(index_to_keep) + ' ' + str(coding_pos) + ' ' + tx_length
-			print(out)
+			index_to_keep = list(range(0,len(coding_pos)))
 			VLall=window_calc_print(tx_length, \
 								fileHandler, \
 								key, \
@@ -249,6 +263,7 @@ def calculator(variant_data, tx_gene_coords, output):
 								gene_name, \
 								strand, \
 								moderate_impact_index)
+			fileHandler.writeVLmoderate('\n'.join(VLmoderate))
 		fileHandler.close_files()
 
 
