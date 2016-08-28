@@ -41,6 +41,7 @@ class FileOperations:
 	def open_files(self, output_name):
 		self.VLall = open(output_name+'.VLall.bed','w')
 		self.VLmoderate = open(output_name+'.VLmoderate.bed','w')
+		self.VLsynonymous = open(output_name+'.VLsynonymous.bed','w')
 		self.error_output = open('errors.txt', 'w')
 		self.skipped_output = open('skipped_tx.txt', 'w')
 				
@@ -54,7 +55,9 @@ class FileOperations:
 	def writeVLmoderate(self, info):
 		self.VLmoderate.write(info)
 		self.VLmoderate.write('\n')
-
+	def writeVLsynonymous(self, info)
+		self.VLsynonymous.write(info)
+		self.VLsynonymous.write('\n')
 	def close_files(self):
 		self.VLall.close()
 		self.error_output.close()
@@ -220,6 +223,7 @@ def calculator(variant_data, tx_gene_coords, output):
 				impact = [x[1] for x in enumerate(impact) if x[0] not in bad_pos]
 				consequence = [x[1] for x in enumerate(consequence) if x[0] not in bad_pos]
 			moderate_impact_index = [x[0] for x in enumerate(impact) if x[1] == 'MODERATE']
+			synonymous_index = [x[0] for x in enumerate(consequence) if [x] == 'synonymous_variant']
 			
 			tx_length = chunk[0].split()[cds_index].split('/')[1]
 			# skip should the transcript not pass the requirements set in the initial pipe for
@@ -242,7 +246,7 @@ def calculator(variant_data, tx_gene_coords, output):
 			
 			# this does all the math and prints
 			# first all variants
-			index_to_keep = list(range(0,len(coding_pos)))
+			all_positions = list(range(0,len(coding_pos)))
 			VLall=window_calc_print(tx_length, \
 								fileHandler, \
 								key, \
@@ -251,7 +255,7 @@ def calculator(variant_data, tx_gene_coords, output):
 								chromosome, \
 								gene_name, \
 								strand, \
-								index_to_keep)
+								all_positions)
 			fileHandler.writeVLall('\n'.join(VLall))
 			# now just print out the number of surrounding moderate alleles
 			VLmoderate=window_calc_print(tx_length, \
@@ -264,6 +268,16 @@ def calculator(variant_data, tx_gene_coords, output):
 								strand, \
 								moderate_impact_index)
 			fileHandler.writeVLmoderate('\n'.join(VLmoderate))
+			VLsynonymous=window_calc_print
+								fileHandler, \
+								key, \
+								exon_coords, \
+								coding_pos, \
+								chromosome, \
+								gene_name, \
+								strand, \
+								synonymous_index)
+			fildeHander.writeVLsynonymous('\n'.join(VLsynonymous))
 		fileHandler.close_files()
 
 
