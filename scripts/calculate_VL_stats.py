@@ -55,7 +55,7 @@ class FileOperations:
 	def writeVLmoderate(self, info):
 		self.VLmoderate.write(info)
 		self.VLmoderate.write('\n')
-	def writeVLsynonymous(self, info)
+	def writeVLsynonymous(self, info):
 		self.VLsynonymous.write(info)
 		self.VLsynonymous.write('\n')
 	def close_files(self):
@@ -268,7 +268,7 @@ def calculator(variant_data, tx_gene_coords, output):
 								strand, \
 								moderate_impact_index)
 			fileHandler.writeVLmoderate('\n'.join(VLmoderate))
-			VLsynonymous=window_calc_print
+			VLsynonymous=window_calc_print(tx_length, \
 								fileHandler, \
 								key, \
 								exon_coords, \
@@ -277,7 +277,7 @@ def calculator(variant_data, tx_gene_coords, output):
 								gene_name, \
 								strand, \
 								synonymous_index)
-			fildeHander.writeVLsynonymous('\n'.join(VLsynonymous))
+			fileHandler.writeVLsynonymous('\n'.join(VLsynonymous))
 		fileHandler.close_files()
 
 
