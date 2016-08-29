@@ -114,25 +114,32 @@ def exon_processor(exon_coords, strand):
 	# remove the chromosome from exon coords for calculations
 	exon_coords = [x[1:3] for x in exon_coords]
 	# convert to integer and ensure they are sorted
-	exon_coords = sorted([[int(pos) for pos in x] for x in exon_coords])
+	exon_coords = [[int(pos) for pos in x] for x in exon_coords]
 	# shift stop positions by 3 to include stop codon (which CDS doesn't not include)
-	if strand == '+':	
-		exon_coords[-1][1] += 3
-	if strand == '-':
-		exon_coords[0][0] -= 3
-	
-	# prep for offset calcs by inserting dummy values at beginning
-	exon_coords.insert(0,[1,1])
+	exon_coords[-1][1] += 3
 	# calculate offsets for each exon coordinate set
 	offsets = [0]
-	for i in range(1,len(exon_coords)):
-		the_offset = exon_coords[i][0] - exon_coords[i-1][1]
-		offsets.append(offsets[i-1]+the_offset)
-	offsets.pop(0); exon_coords.pop(0) # remove dummy values
-	
-	# calculate new exon coords from 1 to len(transcript) continuously
-	# will later use the offsets calculated to re-calce the actual genomic positions
-	shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)]
+	if strand == '+':
+		# prep for offset calcs by inserting dummy values at beginning
+		exon_coords.insert(0,[1,1])
+		for i in range(1,len(exon_coords)):
+			the_offset = exon_coords[i][0] - exon_coords[i-1][1]
+			offsets.append(offsets[i-1]+the_offset)
+		offsets.pop(0); exon_coords.pop(0) # remove dummy values
+		# calculate new exon coords from 1 to len(transcript) continuously
+		# will later use the offsets calculated to re-calce the actual genomic positions
+		shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)]
+	elif strand == '-':
+		# set offsets again
+		exon_coords.insert(0,[0,0])
+		for i in range(1,len(exon_coords)):
+			the_offset = exon_coords[i][1] - exon_coords[i-1][0]
+			offsets.append(offsets[i-1]+the_offset)
+		offsets.pop(0); exon_coords.pop(0)
+		shifted_exon_coords = [[abs(x[1][1]-offsets[x[0]]),abs(x[1][0]-offsets[x[0]])] for x in enumerate(exon_coords)] 
+	else:
+		print('Strand is ' + strand + '????')
+		sys.exit(1)
 	return(shifted_exon_coords, offsets)
 
 def window_calc_print(tx_length, \
@@ -149,9 +156,7 @@ def window_calc_print(tx_length, \
 	
 	# remove chr, make numeric, adjust stop coordinate, calculate offsets, shifts the exon coordinates
 	shifted_exon_coords, offsets = exon_processor(exon_coords, strand) 
-	
 	output = []
-
 	# create new position list, removing nonrelevant entries
 	try:
 		coding_pos = [x[1] for x in enumerate(coding_pos) if x[0] in index_to_keep]
@@ -160,6 +165,7 @@ def window_calc_print(tx_length, \
 		out = gene_name + '\n' + str(index_to_keep) + '\n' + str(coding_pos) + '\n' + key
 		print(out)
 		sys.exit(1)
+	# now roll throuch each bp and calculate what's in each window
 	for i in range(1,int(tx_length)+1):
 		windowDown = -50
 		windowUp = 50
@@ -173,12 +179,14 @@ def window_calc_print(tx_length, \
 		overlapping_num = sum( [i+windowDown <= pos <= i+windowUp for pos in coding_pos if pos] ) 
 		# scale for interval size
 		overlapping_num = str( round( overlapping_num * (100 / (windowUp - windowDown)) ) )
-		# calculate actual coordinate by first seeing which (shifted) exon i is in
+		# calculate actual coordinate by firs/t seeing which (shifted) exon i is in
 		exon_offset_index = [x[0] for x in enumerate(shifted_exon_coords) if i in range(x[1][0],x[1][1]+1)]
-		# print(gene_name, strand, tx_length, exon_offset_index, i, shifted_exon_coords)
 		# now can use the index, with the offset info to calc actual genomic position
 		try:
-			real_genomic_position = i + offsets[int(exon_offset_index[0])]
+			if strand == '+':
+				real_genomic_position = i + offsets[int(exon_offset_index[0])]
+			elif strand == '-':
+				real_genomic_position = offsets[int(exon_offset_index[0])] - i
 			out = (chromosome + '\t' + str(real_genomic_position) + '\t' + \
 				str(real_genomic_position + 1) + '\t' + \
 				gene_name + '_' + key + '\t' + overlapping_num + '\t' + strand)
@@ -186,7 +194,6 @@ def window_calc_print(tx_length, \
 			out = gene_name + ' ' +  strand + ' ' +  str(tx_length) + ' ' + str(i) + ' ' + str(exon_offset_index) + ' ' + str(shifted_exon_coords)
 			fileHandler.writeErrors(out)	
 			continue
-
 		output.append(out)
 	return(output)
 
