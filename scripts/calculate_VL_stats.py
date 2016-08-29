@@ -154,7 +154,7 @@ def window_calc_print(tx_length, \
 
 	# create new position list, removing nonrelevant entries
 	try:
-		coding_pos = [x for x in coding_pos if x in index_to_keep]
+		coding_pos = [x[1] for x in enumerate(coding_pos) if x[0] in index_to_keep]
 	except:
 		print('Can\'t create new coding_pos list')
 		out = gene_name + '\n' + str(index_to_keep) + '\n' + str(coding_pos) + '\n' + key
