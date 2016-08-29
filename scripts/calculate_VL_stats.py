@@ -60,6 +60,8 @@ class FileOperations:
 		self.VLsynonymous.write('\n')
 	def close_files(self):
 		self.VLall.close()
+		self.VLmoderate.close()
+		self.VLsynonymous.close()
 		self.error_output.close()
 		self.skipped_output.close()
 
@@ -80,9 +82,6 @@ def build_exon_coords(gencode_file):
 		tx_gene_coords[dict_key] = value
 	return(tx_gene_coords)
 
-#errors = open('errors.txt','w')
-#variant_data = open('/data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.k55.k22n.tab')
-# use dropwhile iterator to skip lines staring with #
 def coding_pos_processor(coding_pos):
 	# convert coding positions to int and handle coordinate range
 	# '67-70' situations
@@ -97,7 +96,7 @@ def coding_pos_processor(coding_pos):
 				x = int( (int(x.split('-')[0]) + int(x.split('-')[1]) ) / 2)
 				int_coding.append(x)
 			except:
-				# need to ID the bad position
+				# need to ID the bad position so this can be fully skipped
 				bad_pos.append(index)
 		else:
 			x = int(x)
@@ -110,6 +109,7 @@ def exon_processor(exon_coords, strand):
 	# and processes to remove chr and make numeric
 	# and also adjusts end position by 3bp 
 	# finally, it calculates the offsets and and shifts the exon coords
+	# so the above coords would now be [[100,200],[200,500],...]
 
 	# remove the chromosome from exon coords for calculations
 	exon_coords = [x[1:3] for x in exon_coords]
@@ -121,17 +121,17 @@ def exon_processor(exon_coords, strand):
 	if strand == '-':
 		exon_coords[0][0] -= 3
 	
-	# prep for offset calcs
+	# prep for offset calcs by inserting dummy values at beginning
 	exon_coords.insert(0,[1,1])
 	# calculate offsets for each exon coordinate set
 	offsets = [0]
 	for i in range(1,len(exon_coords)):
 		the_offset = exon_coords[i][0] - exon_coords[i-1][1]
 		offsets.append(offsets[i-1]+the_offset)
-	offsets.pop(0); exon_coords.pop(0)
+	offsets.pop(0); exon_coords.pop(0) # remove dummy values
 	
 	# calculate new exon coords from 1 to len(transcript) continuously
-	# can use the offets calculated to re-make the positions
+	# will later use the offsets calculated to re-calce the actual genomic positions
 	shifted_exon_coords = [[x[1][0]-offsets[x[0]],x[1][1]-offsets[x[0]]] for x in enumerate(exon_coords)]
 	return(shifted_exon_coords, offsets)
 
@@ -172,10 +172,10 @@ def window_calc_print(tx_length, \
 		# calc number of variants in the window 
 		overlapping_num = sum( [i+windowDown <= pos <= i+windowUp for pos in coding_pos if pos] ) 
 		# scale for interval size
-		overlapping_num = str( round( overlapping_num * (100/ (windowUp - windowDown)) ) )
-		# calculate actual coordinate by seeing which (shifted) exon i is in
+		overlapping_num = str( round( overlapping_num * (100 / (windowUp - windowDown)) ) )
+		# calculate actual coordinate by first seeing which (shifted) exon i is in
 		exon_offset_index = [x[0] for x in enumerate(shifted_exon_coords) if i in range(x[1][0],x[1][1]+1)]
-		#print(gene_name, strand, tx_length, exon_offset_index, i, shifted_exon_coords)
+		# print(gene_name, strand, tx_length, exon_offset_index, i, shifted_exon_coords)
 		# now can use the index, with the offset info to calc actual genomic position
 		try:
 			real_genomic_position = i + offsets[int(exon_offset_index[0])]
@@ -191,7 +191,7 @@ def window_calc_print(tx_length, \
 	return(output)
 
 	
-def calculator(variant_data, tx_gene_coords, output):
+def central_depot(variant_data, tx_gene_coords, output):
 	fileHandler = FileOperations()
 	fileHandler.open_files(output)
 	# grab header
@@ -207,7 +207,7 @@ def calculator(variant_data, tx_gene_coords, output):
 	
 	# skip header lines
 	for line in dropwhile(lambda line: line.startswith('#'), variant_data):	
-		# group on transcript name. File MUST BE SORTED BY transcript name
+		# group on transcript name. File MUST BE PRE-SORTED BY transcript name
 		# if not, then things will go TERRIBLY WRONG!!!!!!!!!!!!!!
 		for key, chunk in groupby(variant_data, lambda x: x.split()[4]):
 			chunk = list(chunk)
@@ -218,6 +218,7 @@ def calculator(variant_data, tx_gene_coords, output):
 			gmaf = [x.split('\t')[gmaf_index] for x in chunk]
 			impact = [x.split('\t')[impact_index] for x in chunk]
 			consequence = [x.split('\t')[consequence_index] for x in chunk]
+			# if we have poorly formatted positions, remove from our index so we don't process it
 			if len(bad_pos)>0:
 				gmaf = [x[1] for x in enumerate(gmaf) if x[0] not in bad_pos]
 				impact = [x[1] for x in enumerate(impact) if x[0] not in bad_pos]
@@ -257,7 +258,7 @@ def calculator(variant_data, tx_gene_coords, output):
 								strand, \
 								all_positions)
 			fileHandler.writeVLall('\n'.join(VLall))
-			# now just print out the number of surrounding moderate alleles
+			# now just print out nums of surrounding moderate alleles
 			VLmoderate=window_calc_print(tx_length, \
 								fileHandler, \
 								key, \
@@ -268,6 +269,7 @@ def calculator(variant_data, tx_gene_coords, output):
 								strand, \
 								moderate_impact_index)
 			fileHandler.writeVLmoderate('\n'.join(VLmoderate))
+			# now nums of surrounding synonymous alleles
 			VLsynonymous=window_calc_print(tx_length, \
 								fileHandler, \
 								key, \
@@ -295,7 +297,7 @@ def main():
 	output = args.output_file_name	
 	tx_gene_coords = build_exon_coords(gencode_file) 
 	
-	calculator(human_var_file, tx_gene_coords, output)	
+	central_depot(human_var_file, tx_gene_coords, output)	
 
 
 
