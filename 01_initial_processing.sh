@@ -15,7 +15,7 @@ tabix -p vcf /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__cod
 # annotate with VEP/84, adding MAF from 1000G, ESP, ExAC as well as gene coding positions
 sbatch --cpus-per-task 16 ~/git/human_variation_landscape/scripts/run_VEP.sh /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.tab GRCh38 16
 # reorder by transcript, then position
-cat <(cat Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.tab | head -n 1000 | grep ^#) <(grep -v ^# Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.tab | sort -k5,5 -k2,2n) > Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.k55.k22n.tab
+cat <(cat Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.tab | head -n 1000 | grep ^#) <(grep -v ^# Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.tab | sort -k5,5 -k2,2n) > Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.k55.k22n.h.tab
 
 # get gencode's v25 (latest as of 2016-08-17) gene annotation info
 wget ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_25/gencode.v25.annotation.gtf.gz
@@ -25,8 +25,8 @@ gtf2bed --do-not-sort < gencode.v25.annotation.gtf > gencode.v25.annotation.bed
 gzip gencode.v25.annotation.gtf
 bgzip gencode.v25.annotation.bed
 
-# keep only coding exons (CDS) from canonical genes
-zcat gencode.v25.annotation.bed.gz | awk '$8=="CDS" {print $0}' | grep -i 'tag \"basic\"' | grep -i 'gene_type \"protein_coding\"' | grep -i 'appris_principal_1' | grep -i 'tag \"CCDS\"' > gencode.v25.annotation.CDS.protein-coding.principal.CCDS.bed.gz
+# keep only coding exons (CDS) from the principal transript for protein-coding  gene
+zcat gencode.v25.annotation.bed.gz | awk '$8=="CDS" {print $0}' | grep -i 'tag \"basic\"' | grep -i 'gene_type \"protein_coding\"' | grep -i 'appris_principal' | grep -i 'tag \"CCDS\"' > gencode.v25.annotation.CDS.protein-coding.principal.CCDS.bed.gz
 
 
 
