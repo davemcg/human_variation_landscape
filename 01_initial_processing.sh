@@ -9,133 +9,84 @@ wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapie
 
 
 # keep only coding variation
+# http://useast.ensembl.org/info/genome/variation/predicted_data.html#consequences
 cat <(zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | head -n 1000 | grep ^#) <(zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | grep 'frameshift_variant\|inframe\|missense_variant\|start_lost\|stop_gained\|stop_lost\|synonymous_variant') | bgzip > /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.vcf
 tabix -p vcf /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.vcf
 # annotate with VEP/84, adding MAF from 1000G, ESP, ExAC as well as gene coding positions
-sbatch --cpus-per-task 16 ~/git/human_variation_landscape/run_VEP.sh /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.vcf GRCh38 16
+sbatch --cpus-per-task 16 ~/git/human_variation_landscape/scripts/run_VEP.sh /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.tab GRCh38 16
+# reorder by transcript, then position
+cat <(cat Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.tab | head -n 1000 | grep ^#) <(grep -v ^# Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.tab | sort -k5,5 -k2,2n) > Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.k55.k22n.tab
 
-
-
-
-
-
-
-
-
-#####
-# two (three) paths: 1 (1_sub) and 2
-# 1 is to calculate amount of human variation in all transcripts/genes. 100bp windows. Sliding by 1bp.
-#	- output are four bed files with different stats
-#	- GRCh38 Ensembl v85 and gencode v25 (latest versions as of 2016-08-17)
-# 	- 1_sub is the same, but done with GRCh37 Ensembl v83
-#		and gencode v25 lifted onto GRCh37 (latest versions as of 2016-08-17)
-# 2 is to get the human variation in 100bp windows around each known variant 
-#	- output is a new VCF file with the four stats in the VCF
-
-# data storage on biowulf2
-cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/
-
-#####
-#1 alter gencode gtf to give bed style coordinates for each transcript
-# mostly uses bedops with a awk step to only keep transcripts
-# download it. v25 latest as of 2016-08-17
+# get gencode's v25 (latest as of 2016-08-17) gene annotation info
 wget ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_25/gencode.v25.annotation.gtf.gz
+# convert to bed
 gunzip gencode.v25.annotation.gtf.gz
 gtf2bed --do-not-sort < gencode.v25.annotation.gtf > gencode.v25.annotation.bed
 gzip gencode.v25.annotation.gtf
-gzip gencode.v25.annotation.bed
+bgzip gencode.v25.annotation.bed
 
-# get Ensembl's GRCh38 v85 (latest as of 2016-08-17)  human variation file
-cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/GRCh38
-wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz
-wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz.tbi
-
-# set of piped commands to process the annotation info and create four bed files with 100bp windows (1bp steps) for stats
-# on the number of variants in the 100bp vicinity
-	# first parse the gencode data to keep exons from canonical ('basic') protein-coding trancripts
-	# 2016-08-23, 19950 transcripts and 834420 exons
-	zcat gencode.v25.annotation.bed.gz | awk '$8=="exon" || $8=="start_codon" || $8=="stop_codon" || $8=="UTR" {print $0}' | \
-	grep -i 'tag \"basic\"' | grep -i 'gene_type \"protein_coding\"' | \
-    # increase each exon by 50bp each direction
-    bedtools slop -g /data/mcgaugheyd/genomes/GRCh38/hg38.chrom.sizes -b 50 -i - | \
-	# get chr pos sort 
-	sort -k1,1 -k2,2n | \
-    # merge overlaps and pull the gene name
-    bedtools merge -i - -c 4 -o distinct  | \
-    # convert gencode to ensembl chr notation (chr1 to 1)
-    ~/git/ChromosomeMappings/./convert_notation.py -c ~/git/ChromosomeMappings/GRCh38_gencode2ensembl.txt -f - | \
-	# get chr sort correct for new naming
-	sort -k1,1 -k2,2n | \
-	# create 100bp windows, sliding by one, retain gene name
-    bedtools makewindows -b - -w 100 -s 1 -i src | \
-    #loj back onto the ensembl variation file
-    bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted -g /data/mcgaugheyd/genomes/GRCh38/GRCh38.ensembl.k11sort.chrom.sizes | \
-    ~/git/human_variation_landscape/scripts/loj_groupby_gw.py -n Gencode_v25_Ensembl_v85 -l -
+# keep only coding exons (CDS) from canonical genes
+zcat gencode.v25.annotation.bed.gz | awk '$8=="CDS" {print $0}' | grep -i 'tag \"basic\"' | grep -i 'gene_type \"protein_coding\"' | grep -i 'appris_principal_1' | grep -i 'tag \"CCDS\"' > gencode.v25.annotation.CDS.protein-coding.principal.CCDS.bed.gz
 
 
-# can compress bed files down to bedGraph with scripts/bed_to_bedGraph.py
-swarm -f ~/git/human_variation_landscape/scripts/run_bed_to_bedGraph.swarm
 
-#########
-#1_sub do the same as above, but with GRCh37 annotations/build
-# get Ensembl's GRCh37 human variation file
-cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/GRCh37
-wget http://ftp.ensembl.org/pub/grch37/release-83/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz
-wget http://ftp.ensembl.org/pub/grch37/release-83/variation/vcf/homo_sapiens/Homo_sapiens_incl_consequences.vcf.gz.tbi
+#######################
+# Computation of window counts with my own script.
+# as of 2016-08-30, the script outputs allele counts in 100bp windows for all variants,
+# and variants in VEP/snpeff HIGH, MODERATE, LOW categories
+# b8655ec (git commit) 
+sbatch --time=3:00:00 ~/git/human_variation_landscape/scripts/calculate_VL_stats.py -g gencode.v25.annotation.CDS.protein-coding.principal.CCDS.bed -v Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.k55.k22n.h.tab -o Gencode_v25_Ensembl_v85_VEP_v84
+########################
 
-# move to data location on biowulf2
-cd /data/mcgaugheyd/projects/nei/mcgaughey/human_variation_landscape/GRCh37
-
-# grab GRCh37 gencode genes
-wget ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_25/GRCh37_mapping/gencode.v25lift37.annotation.gtf.gz
-gunzip gencode.v25lift37.annotation.gtf.gz
-gtf2bed --do-not-sort < gencode.v25lift37.annotation.gtf > gencode.v25lift37.annotation.bed #convert gtf to bed
-# compress again
-gzip gencode.v25lift37.annotation.gtf
-gzip gencode.v25lift37.annotation.bed
-# only keep transcripts
-zcat gencode.v25lift37.annotation.bed.gz| awk '$8 == "transcript" {print $0}' | gzip -f > gencode.v25lift37.annotation.transcriptsOnly.bed.gz
-
-
-# set of piped commands to process the annotation info and create four bed files with 100bp windows (1bp steps) for stats
-# on the number of variants in the 100bp vicinity
-    # increase each transcript size by 1000 in each direction then merge overlapping transcripts
-    bedtools slop -g /data/mcgaugheyd/genomes/GRCh37/GRCh37.gencode.chrom.sizes -b 1000 -i gencode.v25lift37.annotation.transcriptsOnly.bed.gz | \
-	# get chr pos sorted
-	sort -k1,1 -k2,2n | \
-    # merge overlaps
-    bedtools merge -i - | \
-    # convert gencode to ensembl chr notation (chr1 to 1)
-    ~/git/ChromosomeMappings/./convert_notation.py -c ~/git/ChromosomeMappings/GRCh37_gencode2ensembl.txt -f - | \
- 	# ensure sort is correct for new chr naming
-	sort -k1,1 -k2,2n | \    
-	# create 100bp windows, sliding by one
-    bedtools makewindows -b - -w 100 -s 1  | \
-    # create ID
-    awk -v OFS='\t' '{key=$1"_"$2"_"$3; print $1, $2, $3, key}' | \
-    # loj back onto the ensembl variation file
-    bedtools intersect -b /data/mcgaugheyd/genomes/GRCh37/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted -g /data/mcgaugheyd/genomes/GRCh37/GRCh37.ensembl.k11_sort.chrom.sizes |
-    ~/git/human_variation_landscape/scripts/loj_groupby_gw.py -n Gencode_v25lift37_Ensembl_v83 -l -
+# sort, bgzip, tabix
+for i in Gen*VEP*bed; do echo 'sort -k1,1 -k2,2n ' $i '> '${i%.bed}.s.bed'; bgzip ' ${i%.bed}.s.bed'; tabix -p bed ' ${i%.bed}.s.bed.gz ; done > sort_bgzip_tabix.swarm
+swarm -f sort_bgzip_tabix.swarm --partition=quick
 
 
 
 
 
-####
-# 2. Annotate existing variation for surrouding variation
-# skip header lines
-zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | grep -v ^# | \
-# create a 100bp window around each variant and make a CHR_POS_REF_ALT key
-awk -v OFS='\t' '{key=$1"_"$2"_"$4"_"$5; print $1, $2-50, $2+50, key}' | \
-# intersect against the original variation file and do a loj
-bedtools intersect -b /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz -a - -loj -sorted | \
-# send to my script which collapses the overlapping variants and calculates the four stats and writes
-# a new VCF with the stats
-~/git/human_variation_landscape/scripts/loj_groupby_vcf.py > 20160701_ensembl_homo_sapiens_variation.100bp_window.vcf
 
-# compress
-bgzip 20160701_ensembl_homo_sapiens_variation.100bp_window.vcf
-tabix -p vcf 20160701_ensembl_homo_sapiens_variation.100bp_window.vcf.gz
+
+
+
+
+
+
+# the run_VEP script
+sed -e 's/^/# /g' ~/git/human_variation_landscape/scripts/run_VEP.sh 
+# #!/bin/bash
+# 
+# module load VEP/84
+# 
+# 
+# input_vcf=$1
+# genome=$2
+# cores=$3
+# 
+# if [ "$genome" == "GRCh38" ] || [ "$genome" == "GRCh37" ]; then
+# 	variant_effect_predictor.pl -i $input_vcf --offline \
+# 	--cache --dir_cache $VEPCACHEDIR \
+# 	--fasta $VEPCACHEDIR/$genome.fa --species human --assembly $genome  \
+# 	--output ${input_vcf%.vcf}.VEPnoPick.$genome.tab \
+#     --canonical \
+# 	--coding_only \
+# 		--sift s \
+#     --polyphen s \
+#     --symbol \
+# 	--gmaf \
+# 	--maf_1kg \
+# 	--maf_esp \
+# 	--maf_exac \
+# 	--domains \
+# 	--total_length \
+# 	--tab --force_overwrite --fork $cores
+# else
+#     echo "Pick either GRCh38 or GRCh37 genomes"
+# fi
+
+
+
 
 
 
