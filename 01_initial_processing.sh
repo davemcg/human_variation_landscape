@@ -13,7 +13,9 @@ wget http://ftp.ensembl.org/pub/release-85/variation/vcf/homo_sapiens/Homo_sapie
 cat <(zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | head -n 1000 | grep ^#) <(zcat /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences.vcf.gz | grep 'frameshift_variant\|inframe\|missense_variant\|start_lost\|stop_gained\|stop_lost\|synonymous_variant') | bgzip > /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.vcf
 tabix -p vcf /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.vcf
 # annotate with VEP/84, adding MAF from 1000G, ESP, ExAC as well as gene coding positions
-sbatch --cpus-per-task 16 ~/git/human_variation_landscape/scripts/run_VEP.sh /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.tab GRCh38 16
+sbatch --cpus-per-task 8 ~/git/human_variation_landscape/scripts/run_VEP.sh /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.tab GRCh38 tab 8
+# run again, but output as vcf for annotating purposes with vcfanno
+sbatch --cpus-per-task 8 ~/git/human_variation_landscape/scripts/run_VEP.sh /data/mcgaugheyd/genomes/GRCh38/Homo_sapiens_incl_consequences__codingOnly.vcf GRCh38 vcf 8
 # reorder by transcript, then position
 cat <(cat Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.tab | head -n 1000 | grep ^#) <(grep -v ^# Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.tab | sort -k5,5 -k2,2n) > Homo_sapiens_incl_consequences__codingOnly.VEPnoPick.GRCh38.k55.k22n.h.tab
 
