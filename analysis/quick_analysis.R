@@ -111,10 +111,17 @@ ggplot(data=training_set.m , aes(x=Value, colour=Status))+geom_density() + theme
 
 
 
+####clinvar only vcf######
+#vcf_file = '~/Desktop/Homo_sapiens_clinically_associated.VLNum.vcf.gz'
+vcf_file = '~/Desktop/Homo_sapiens_incl_consequences__codingOnly.VEP.GRCh38.VLN.CLINpath_benign.vcf.gz'
+rows_to_skip <- as.integer(system( paste(paste('gzcat ',vcf_file),' | head -n 1000 | grep ^## | wc -l'), intern=T))
+clinOnly_vcf <- fread(paste('gzcat ',vcf_file),skip=rows_to_skip)
 
+clinOnly_vcf <- clinOnly_vcf  %>% filter(grepl('VLN100all=',V8))
 
-
-
+clinOnly_vcf$VLN100all <- (grab_value(parse_vcf_info(clinOnly_vcf$V8,'VLN100all='),'='))
+clinOnly_vcf %>% mutate(Status=ifelse(grepl('(?=.*CLIN_pathogenic.*)(?=.*CLIN_benign)', V8, perl=TRUE),'Conflicting', ifelse(grepl('CLIN_pathogenic',V8),'Pathogenic',ifelse(grepl('CLIN_benign',V8),'Benign','Absent')))) %>% 
+  ggplot(aes(x=VLN100all, colour=Status))+geom_density() + theme_Publication() + coord_cartesian(xlim=c(0,100))
 
 
 
