@@ -49,14 +49,14 @@ clin_vcf <- clin_vcf %>% filter(grepl('CSQ=',V8)) %>% filter(grepl('VLN',V8)) %>
 # some issue with exac
 #clin_vcf <- clin_vcf %>% filter(grepl('CSQ=',V8)) %>% mutate(ExAC_Adj=parse_vcf_info_extended(V8,'CSQ',37))
 # get variant status, toss variants without VLN scores
-clin_vcf <- clin_vcf %>% filter(grepl('CSQ=',V8)) %>% filter(grepl('VLN',V8)) %>% mutate(GMAF=parse_vcf_info_extended(V8,'CSQ',2),':')
+clin_vcf <- clin_vcf %>% mutate(Variant_Type=grab_value(parse_vcf_info_extended(V8,'CSQ',2),':'))
 # pull VLN scores
 clin_vcf <- clin_vcf %>% mutate(VLN100all=grab_value(parse_vcf_info(V8,'VLN100all'),'='))
 clin_vcf <- clin_vcf %>% mutate(VLN100high=grab_value(parse_vcf_info(V8,'VLN100high'),'='))
 clin_vcf <- clin_vcf %>% mutate(VLN100moderate=grab_value(parse_vcf_info(V8,'VLN100moderate'),'='))
 clin_vcf <- clin_vcf %>% mutate(VLN100low=grab_value(parse_vcf_info(V8,'VLN100low'),'='))
 # save, as the above takes OVERNIGHT to calculate
-save(clin_vcf,file='clin_vcf.Rdata')
+save(clin_vcf,file='clin_vcf_2016-09-02.2.Rdata')
 
 # change NA to 0 in GMAF
 GMAF0 <- clin_vcf$GMAF
