@@ -9,7 +9,7 @@ header = ['Chr','Position','ID','Ref','Alt','Variant_Class','GMAF','ExAC',\
 			'VLN100all','VLN100high','VLN100moderate','VLN100low']
 
 out_file=open('Homo_sapiens_incl_consequences__codingOnly.VLNum.VEPnoPick.GRCh38.20160906.my.tab','w')
-out_file.write('\t'.join(header))
+out_file.write('\t'.join(header)+'\n')
 for line in fileinput.input():
 	if line[0]=='#':
 		continue
@@ -50,6 +50,6 @@ for line in fileinput.input():
 	out = 	chr, position, id, ref, alt, variant_class, gmaf, exac, \
 			cadd_phred,cadd_raw, cadd_raw_rankscore, polyphen, sift, \
 			clin_sig, vln100all,vln100high, vln100mod, vln100low
-	out_file.write('\t'.join(out))
+	out_file.write('\t'.join(out)+'\n')
 
 out_file.close()
