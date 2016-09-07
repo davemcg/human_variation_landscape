@@ -1,3 +1,19 @@
+---
+title: "VLN Analysis for prediction of Pathogenic / Benign"
+author: "David McGaughey"
+date: "September 7, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, cache = TRUE, message= FALSE)
+```
+
+## R Markdown
+
+Analysis of the performance of VLN (variant lanscape numbers, 100bp window, GRCh38) in categorizing ClinVar pathogenic against benign variants. CADD used as the 'gold standard' to compare performance.
+
+```{r, echo = FALSE}
 library(data.table)
 library(dplyr)
 library(ggplot2)
@@ -74,8 +90,10 @@ training_set <- clin_set[train60_index, ]
 # the rest, for later
 query20_set <- clin_set[query20_index, ]
 test20_set <- clin_set[test20_index, ]
+```
 
-
+Exploratory analysity with summary stats and density plots of VLN in benign and pathogenic variant sets. 
+```{r}
 ##########
 # exploratory analysis, quick stats
 
@@ -83,12 +101,20 @@ test20_set <- clin_set[test20_index, ]
 training_set.m <- training_set %>% gather(.,VLN,Value,-Chr,-Position,-ID,-Ref,-Alt,-Variant_Class,-GMAF,-ExAC,-CADD_phred, -CADD_raw, -CADD_raw_rankscore, -PolyPhen, -SIFT, -Clin_Sig, -GMAF0, -ExAC0, -Status)
 # density plot
 training_set %>% ggplot(aes(x=VLN100all, colour=Status))+geom_density() + theme_Publication() + coord_cartesian(xlim=c(0,100))
-# Uh....everything looks about the same
+```
+
+Uh....everything looks about the same. This isn't how the earlier plot looked. Let's look at some numbers.
+
+```{r}
 # summary stats by VLNtype and Pathogenic/Benign
 training_set.m %>% group_by(VLN,Status) %>% summarise(mean(Value), median(Value),`25th_percentile`=quantile(Value,0.25),`75th_percentile`=quantile(Value,0.75),Total=n())
-# So....pathogenic seems to generally have a higher VLN than the 'benign'. Which is opposite my initial finding. And our expectation. 
-# What is going on here? The answer is very simple, but it took me a while to figure out.
-# Let's pull in ensembl's clinvar_only variant set, which was used to generate the plot that we've seen before
+```
+
+So....pathogenic seems to generally have a higher VLN than the 'benign'. Which is opposite my initial finding. And our expectation. 
+What is going on here? The answer is very simple, but it took me a while to figure out. 
+Let's pull in ensembl's clinvar_only variant set, and remake the plot (this is what was used for the Molecular Rounds fig in August) and see the summary stats.
+```{r, echo=FALSE}
+
 vcf_file = '~/Desktop/Homo_sapiens_clinically_associated.VLNum.vcf.gz'
 rows_to_skip <- as.integer(system( paste(paste('gzcat ',vcf_file),' | head -n 1000 | grep ^## | wc -l'), intern=T))
 clinOnly_vcf <- fread(paste('gzcat ',vcf_file),skip=rows_to_skip)
@@ -102,19 +128,28 @@ clinOnly_vcf <- clinOnly_vcf %>% filter(grepl('VLN100low',V8)) %>% mutate(VLN100
 clinOnly_vcf <- clinOnly_vcf %>% filter(grepl('CLIN',V8)) %>% mutate(ClinSig=parse_vcf_info(V8,'CLIN'))
 # now let's label the clin sig as either benign, pathogenic, or conflicting (dual labelled)
 clinOnly_vcf <- clinOnly_vcf %>% mutate(Status=ifelse(grepl('(?=.*CLIN_pathogenic.*)(?=.*CLIN_benign)', V8, perl=TRUE),'Conflicting', ifelse(grepl('pathogenic',V8),'Pathogenic',ifelse(grepl('benign',V8),'Benign','Other'))))
+```
+
+```{r}
 # recreate the density plot we've seen before:
 clinOnly_vcf %>% filter(Status!='Conflicting', Status!='Other') %>% 
   ggplot(aes(x=VLN100all, colour=Status))+geom_density() + theme_Publication() + coord_cartesian(xlim=c(0,100))
 # summary stats, as above:
 clinOnly_vcf %>% gather(.,VLN,Value,-V1,-V2,-V3,-V4,-V5,-V6,-V7,-V8,-ClinSig,-Status) %>% group_by(VLN, Status) %>% filter(Status!='Conflicting', Status!='Other') %>% summarise(mean(Value), median(Value),`25th_percentile`=quantile(Value,0.25),`75th_percentile`=quantile(Value,0.75),Total=n())
-# what immediately pops out is how FEW benign variants there are. Did I screw up the filtering?
+```
+OK, the plot looks the same. 
+BUT: What immediately pops out is how FEW benign variants there are. Did I screw up the filtering?
+```{r}
 # checking number of benign (of ANY kind) in original vcf
 orig_clin %>% filter(grepl('benign',V8)) %>% nrow()
-# 1238....so for some reason there are VERY VERY few benigns
+```
+1238....so for some reason there are VERY VERY few benigns. 
 
-# I then downloaded the latest clinvar vcf from NCBI's ftp site
-# ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/ 
-# clinvar_20160831.vcf.gz
+I then downloaded the latest clinvar vcf from NCBI's ftp site:
+ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/ 
+clinvar_20160831.vcf.gz
+```{r, echo=FALSE}
+
 # used vcfanno to add my VLN stats to the vcf then will process the same as above
 vcf_file = '~/Desktop/clinvar_20160831.VLN.vcf.gz'
 rows_to_skip <- as.integer(system( paste(paste('gzcat ',vcf_file),' | head -n 1000 | grep ^## | wc -l'), intern=T))
@@ -126,6 +161,10 @@ clinOnly_vcf_latest <- clinOnly_vcf_latest %>% filter(grepl('VLN100moderate',V8)
 clinOnly_vcf_latest <- clinOnly_vcf_latest %>% filter(grepl('VLN100low',V8)) %>% mutate(VLN100low=grab_value(parse_vcf_info(V8,'VLN100low'),'='))
 clinOnly_vcf_latest <- clinOnly_vcf_latest %>% filter(grepl('CLNSIG',V8)) %>% mutate(ClinSig=grab_value(parse_vcf_info(V8,'CLNSIG'),'='))
 # clinvar's release uses '2' as benign and '5' as pathogenic
+```
+
+New density plot, which should look like the density plot from August's molecular rounds
+```{r}
 # let's make a new density plot
 clinOnly_vcf_latest %>% filter(ClinSig %in% c(2,5)) %>% mutate(Status=ifelse(ClinSig==2,'Benign','Pathogenic')) %>% 
   ggplot(aes(x=VLN100all, colour=Status))+geom_density() + theme_Publication() + coord_cartesian(xlim=c(0,100))
@@ -133,14 +172,17 @@ clinOnly_vcf_latest %>% filter(ClinSig %in% c(2,5)) %>% mutate(Status=ifelse(Cli
 clinOnly_vcf_latest %>% filter(ClinSig %in% c(2,5)) %>% mutate(Status=ifelse(ClinSig==2,'Benign','Pathogenic')) %>% 
   gather(.,VLN,Value,-V1,-V2,-V3,-V4,-V5,-V6,-V7,-V8,-ClinSig,-Status) %>% 
   group_by(VLN, Status) %>% summarise(mean(Value), median(Value),quantile(Value,0.25),quantile(Value,0.75),Total=n())
-# OK....now we have 30,000 benign variants
-# So, unfortunately I used a poor data set for my first pass analysis
+```
 
-# well, let's proceed since I've done 95% of the hard work and see whether the VLN numbers have any ability to distinguish
-# benign from pathogenic variants
-# keep your expectations low. very low.
-# first let's see how well CADD does
-# since CADD did a ROC test on higher MAF variants vs clinvar pathogenic, I'll do the same
+OK....now we have 30,000 benign variants
+So, unfortunately I used a poor data set for my first pass analysis. Not sure what ensembl did or is doing. Got unlucky as 800 isn't that small, but apparently it was not representative. I did a lot of work (not shown) comparing variants with highMAF (>0.05) and lowerMAF (<0.01) and they have very similar characteristics (in VLN scoring) to the clinvar benign.
+
+Well, let's proceed since I've done 95% of the hard work and see whether the VLN numbers have any ability to distinguish benign from pathogenic variants
+
+Keep your expectations low. very low.
+
+
+```{r, echo=FALSE}
 training_set_sub <- training_set %>% filter(Status=='Pathogenic'|Status=='Benign_highMAF') %>% filter(!is.na(CADD_raw_rankscore)) %>% mutate(Class=ifelse(Status=='Pathogenic',1,0))
 # training time
 bayesglm_Fit_CADDonly <- train(factor(Class) ~ CADD_raw_rankscore, data=training_set_sub,  preProc = c("center", "scale"), method='bayesglm')
@@ -151,11 +193,18 @@ bayesglm_predict_CADDonly <- predict(bayesglm_Fit_CADDonly, newdata=query20_set_
 pred <- prediction(bayesglm_predict_CADDonly[,2], factor(query20_set_sub$Class))
 perf <- performance(pred, measure = "tpr", x.measure = "fpr") 
 glm_caddOnly_roc <- data.frame(cbind(unlist(perf@x.values),unlist(perf@y.values)))
+```
+First let's see how well CADD does
+Since CADD did a ROC test on higher MAF variants vs clinvar pathogenic in their paper, I'll do the same
+```{r}
 # plot ROC, which shows performance against 50/50 guessing
 ggplot(glm_caddOnly_roc,aes(x=X1,y=X2)) + geom_line() + theme_Publication() + xlab('') + ylab('') + geom_abline() + ggtitle("CADD-only Predictive ROC")
 # CADD's auc (1 is perfect, 0 is worthless) is 0.92. Very good
 auc.tmp <- performance(pred,"auc"); as.numeric(auc.tmp@y.values)
+```
+CADD's auc (1 is perfect, 0.5 is a monkey flipping coins) is 0.92. Very good
 
+```{r, echo=FALSE}
 # OK, now to see if VLN adds any value to CADD
 bayesglm_Fit_CADD_VLN <- train(factor(Class) ~ CADD_raw_rankscore + VLN100high + VLN100moderate + VLN100low, data=training_set_sub,  preProc = c("center", "scale"), method='bayesglm')
 # predict on same test set
@@ -167,12 +216,19 @@ glm_cadd_vln_roc <- data.frame(cbind(unlist(perf@x.values),unlist(perf@y.values)
 glm_caddOnly_roc <- glm_caddOnly_roc %>% mutate(Data='CADD Only')
 glm_cadd_vln_roc <- glm_cadd_vln_roc %>% mutate(Data='CADD and VLN')
 both <- rbind(glm_cadd_vln_roc,glm_caddOnly_roc)
+```
+
+Let's see if the ROC/AUC improves by adding the VLN to the CADD
+```{r}
 # yeah....not helping much
 ggplot(both,aes(x=X1,y=X2,colour=Data)) + geom_line() + theme_Publication() + xlab('') + ylab('') + geom_abline() + ggtitle("CADD and CADD-VLN Predictive ROC")
 # auc is virtually identical, after adding VLN to the predictor
 auc.tmp <- performance(pred,"auc"); as.numeric(auc.tmp@y.values)
+```
+Uh, no. Not at all.
 
-### Let's quickly see how VLN does ALONE as a predictor
+
+```{r, echo=FALSE}
 training_set <- training_set %>% mutate(Class=ifelse(Status=='Pathogenic',1,0))
 bayesglm_Fit_VLN <- train(factor(Class) ~ VLN100high + VLN100moderate + VLN100low, data=training_set,  preProc = c("center", "scale"), method='bayesglm')
 bayesglm_predict_VLN <- predict(bayesglm_Fit_VLN, newdata=query20_set_sub , type='prob')
@@ -181,12 +237,20 @@ perf <- performance(pred, measure = "tpr", x.measure = "fpr")
 glm_vln_roc <- data.frame(cbind(unlist(perf@x.values),unlist(perf@y.values)))
 glm_vln_roc <- glm_vln_roc %>% mutate(Data='VLN Only')
 triple <- rbind(both,glm_vln_roc)
+```
+
+Let's quickly see how VLN does ALONE as a predictor
+
+```{r}
 # not so hot
 ggplot(triple,aes(x=X1,y=X2,colour=Data)) + geom_line() + theme_Publication() + xlab('') + ylab('') + geom_abline() + ggtitle("CADD and CADD-VLN and VLN Predictive ROC")
 # also bad
 auc.tmp <- performance(pred,"auc"); as.numeric(auc.tmp@y.values)
+```
+Well crap.
 
-#### also tested VLN only with a random forest, as it is less sensitive to poor optimization
+
+```{r, echo=FALSE}
 library(doParallel)
 cl <- makePSOCKcluster(8) #parallelize to 8 cores
 clusterEvalQ(cl, library(foreach))
@@ -204,10 +268,14 @@ perf <- performance(pred, measure = "tpr", x.measure = "fpr")
 rf <- data.frame(cbind(unlist(perf@x.values),unlist(perf@y.values)))
 rf <- rf %>% mutate(Data='VLN Only RF')
 quad <- rbind(both,glm_vln_roc,rf)
+```
+Also tested VLN only with a random forest, as it is less sensitive to poor optimization
+```{r}
 # still not so hot
 ggplot(quad,aes(x=X1,y=X2,colour=Data)) + geom_line() + theme_Publication() + xlab('') + ylab('') + geom_abline() + ggtitle("CADD and CADD-VLN and VLN Predictive ROC")
 # still also bad
 auc.tmp <- performance(pred,"auc"); as.numeric(auc.tmp@y.values)
+```
+Summary? This isn't working. 
+We could try doing VLN with CADD scores to see whether the idea of 'regional' or 'landscape' genome variation has any merit. It's possible that straight up counts is a crappy metric. 
 
-# Summary? This isn't working. 
-# We could try doing VLN with CADD scores to see whether the idea of 'regional' or 'landscape' genome variation has any merit. It's possible that straight up counts is a crappy metric. 
