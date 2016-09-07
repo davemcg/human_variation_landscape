@@ -24,10 +24,12 @@ for line in fileinput.input():
 		vln100all = info[vln_pos[0]].split('=')[1]; vln100high = info[vln_pos[1]].split('=')[1]
 		vln100mod = info[vln_pos[2]].split('=')[1]; vln100low = info[vln_pos[3]].split('=')[1]
 	
-		clin = re.compile('^CLIN_')
-		clin_pos = [x[0] for x in enumerate(info) if clin.match(x[1])]
-		clin_sig = info[clin_pos[0]]
-
+		try:
+			clin = re.compile('^CLIN_')
+			clin_pos = [x[0] for x in enumerate(info) if clin.match(x[1])]
+			clin_sig = info[clin_pos[0]]
+		except:
+			clin_sig = ''
 		csq = re.compile('^CSQ=')
 		vep_info_index = [x[0] for x in enumerate(info) if csq.match(x[1])][0]
 		vep_info = info[vep_info_index]
