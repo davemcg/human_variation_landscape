@@ -34,6 +34,10 @@ def central_depot(dbnSFP_file):
 			except:
 				unique_tx = list(set([x.split('\t')[tx_index] for x in chunk]))
 			for tx in unique_tx:
+				# first get genomic info (chromosome, position)
+				chromosome = [x.split('\t')[0] for x in chunk]
+				position = [x.split('\t')[1] for x in chunk]
+
 				print(key,tx)
 				# grab tx specific positions
 				tx_indices = [x[0] for x in enumerate(chunk) if tx in x[1].split('\t')[tx_index]]
@@ -61,12 +65,24 @@ def central_depot(dbnSFP_file):
 					sys.exit(1)
 				tx_cadd_rankscores = [x.split('\t')[CADD_raw_index] for x in tx_data]
 				tx_gerp_rankscores = [x.split('\t')[gerp_index] for x in tx_data]
-				print(tx_aa_pos_list_of_list)
-				print(transcripts_list_of_list)
-				print(pos_of_tx)
-				print(actual_aa_pos)
-				print(tx_cadd_rankscores)
-				print(tx_gerp_rankscores)
+				
+				# OK, now we've got all the data together in nice, evenly-sized lists
+				# what we need to do are: 
+				# 1. remove the -1 positions
+				# 2. do the window calculations
+				coding_pos_to_remove = [x[0] for x in enumerate(actual_aa_pos) if x[1] == -1]
+				actual_aa_pos = [x[1] for x in enumerate(actual_aa_pos) if x[0] not in coding_pos_to_remove]
+				tx_cadd_rankscores = [x[1] for x in enumerate(tx_cadd_rankscores) if x[0] not in coding_pos_to_remove]	
+				tx_gerp_rankscores = [x[1] for x in enumerate(tx_gerp_rankscores) if x[0] not in coding_pos_to_remove]
+				
+				for i in range(0,len(actual_aa_pos)):
+					print(str(chromosome[i])+' '+str(position[i])+' '+str(actual_aa_pos[i])+' '+str(tx_cadd_rankscores[i])+' '+str(tx_gerp_rankscores[i]))
+				#print(tx_aa_pos_list_of_list)
+				#print(transcripts_list_of_list)
+				#print(pos_of_tx)
+				#print(actual_aa_pos)
+				#print(tx_cadd_rankscores)
+				#print(tx_gerp_rankscores)
 				print(str(len(pos_of_tx))+' '+str(len(actual_aa_pos))+' '+str(len(tx_cadd_rankscores))+' '+str(len(tx_gerp_rankscores)))
 				#[print(x.strip()) for x in tx_data]	
 
